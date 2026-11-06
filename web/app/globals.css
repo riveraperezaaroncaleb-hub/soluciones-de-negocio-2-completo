@@ -3,9 +3,17 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  background: #0b0f17;
-  color: #f8fafc;
+  color-scheme: light;
+  --azulejo: #f3f5f7;
+  --capa: #ffffff;
+  --tinta: #0e1a2b;
+  --cromo: #5b6675;
+  --poste-rojo: #c8372d;
+  --poste-azul: #1d3557;
+  --laton: #8a6420;
+  --ok: #17734a;
+  --alerta: #9a5b00;
+  --peligro: #b3261e;
 }
 
 * {
@@ -17,8 +25,12 @@ html {
 }
 
 body {
+  min-height: 100vh;
   margin: 0;
+  background: var(--azulejo);
+  color: var(--tinta);
   font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
 }
 
 button,
@@ -31,108 +43,130 @@ button {
   cursor: pointer;
 }
 
-.shop-image {
-  background-position: center;
-  background-size: cover;
+a,
+button,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
 }
 
-.hero-panel {
-  background:
-    radial-gradient(circle at 82% 25%, rgba(59, 130, 246, 0.1), transparent 35%),
-    linear-gradient(130deg, #121a27 0%, #0f1723 54%, #111923 100%);
-}
-
-.cta-glow {
-  animation: cta-glow 2.4s ease-in-out infinite;
-}
-
-@keyframes cta-glow {
-  0%, 100% { box-shadow: 0 0 0 rgba(59, 130, 246, 0.08); }
-  50% { box-shadow: 0 0 24px rgba(59, 130, 246, 0.42); }
+:focus-visible {
+  outline: 2px solid var(--poste-azul);
+  outline-offset: 2px;
 }
 
 .theme-dark {
-  color: #f8fafc;
-  background-color: #0b0f17;
+  color-scheme: dark;
+  --azulejo: #0e1a2b;
+  --capa: #16263d;
+  --tinta: #eef2f6;
+  --cromo: #a9b4c2;
+  --poste-rojo: #e0493f;
+  --poste-azul: #6fa0e0;
+  --laton: #d4a24c;
+  --ok: #4cc28a;
+  --alerta: #f0b24a;
+  --peligro: #ff7b72;
+  color: var(--tinta);
+  background-color: var(--azulejo);
+}
+
+.theme-light {
+  color-scheme: light;
+  color: var(--tinta);
+  background-color: var(--azulejo);
 }
 
 .theme-dark .bg-white,
 .theme-dark [class~="bg-white/95"] {
-  background-color: #111827 !important;
+  background-color: var(--capa) !important;
 }
 
 .theme-dark .bg-canvas,
 .theme-dark .bg-gray-50 {
-  background-color: #151b27 !important;
+  background-color: #1b2b40 !important;
 }
 
 .theme-dark .bg-gray-100 {
-  background-color: #1d2735 !important;
-}
-
-.theme-dark .bg-green-50,
-.theme-dark .bg-blue-50,
-.theme-dark .bg-amber-50,
-.theme-dark .bg-orange-50,
-.theme-dark .bg-purple-50 {
-  background-color: #1b2532 !important;
+  background-color: #24364d !important;
 }
 
 .theme-dark .border-gray-100,
 .theme-dark .border-gray-200,
 .theme-dark .border-gray-300 {
-  border-color: rgba(148, 163, 184, 0.18) !important;
+  border-color: color-mix(in srgb, var(--cromo) 25%, transparent) !important;
 }
 
 .theme-dark .text-ink {
-  color: #f8fafc !important;
+  color: var(--tinta) !important;
 }
 
 .theme-dark .text-muted,
 .theme-dark .text-gray-600,
-.theme-dark .text-gray-500 {
-  color: #aab4c3 !important;
-}
-
-.theme-dark .text-gray-400 {
-  color: #9aa5b5 !important;
-}
-
-.theme-dark .bg-lime\/20,
-.theme-dark .bg-lime\/30,
-.theme-dark .bg-lime\/35 {
-  background-color: rgba(52, 211, 153, 0.08) !important;
+.theme-dark .text-gray-500,
+.theme-dark .text-gray-400,
+.theme-dark .text-gray-300 {
+  color: var(--cromo) !important;
 }
 
 .theme-dark input,
 .theme-dark select {
-  color: #f8fafc;
+  color: var(--tinta);
   color-scheme: dark;
-  background-color: #0b0f17;
+  background-color: var(--capa);
 }
 
 .theme-dark input::placeholder {
-  color: #7d8999;
+  color: var(--cromo);
 }
 
-.theme-light {
-  color: #172019;
-  background-color: #f6f7f4;
+.theme-light input,
+.theme-light select {
   color-scheme: light;
 }
 
-.theme-light .hero-panel {
+.hero-panel {
   background:
-    radial-gradient(circle at 82% 25%, rgba(59, 130, 246, 0.09), transparent 35%),
-    linear-gradient(130deg, #f8fafc 0%, #e8eef5 100%);
+    radial-gradient(circle at 84% 25%, color-mix(in srgb, var(--poste-azul) 12%, transparent), transparent 38%),
+    var(--capa);
 }
 
-.theme-light .text-gray-300 {
-  color: #4b5563;
+.shop-image {
+  background-position: center;
+  background-size: cover;
 }
 
-.theme-light .bg-\[\#111827\] {
-  background-color: #172019;
+.poste {
+  background:
+    repeating-linear-gradient(45deg, var(--poste-rojo) 0 10px, var(--capa) 10px 20px, var(--poste-azul) 20px 30px, var(--capa) 30px 40px)
+      left / var(--p, 0%) 100% no-repeat,
+    color-mix(in srgb, var(--cromo) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .poste[data-activo="true"] {
+    animation: poste-giro 6s linear infinite;
+  }
+}
+
+@keyframes poste-giro {
+  to { background-position: 40px 0, 0 0; }
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  transform: translateY(-150%);
+  border-radius: 0.5rem;
+  background: var(--tinta);
+  padding: 0.75rem 1rem;
+  color: var(--capa);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 .line-clamp-2 {
@@ -143,7 +177,7 @@ button {
 }
 
 ::selection {
-  background: #3b82f6;
+  background: var(--poste-azul);
   color: #ffffff;
 }
 

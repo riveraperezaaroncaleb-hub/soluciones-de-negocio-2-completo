@@ -6,11 +6,14 @@ import {
   ArrowRight,
   ArrowUpRight,
   BadgePercent,
+  CalendarDays,
   Check,
+  Clock3,
   ChevronDown,
   CircleHelp,
   Gift,
   Heart,
+  Home,
   Instagram,
   MapPin,
   Menu,
@@ -19,19 +22,19 @@ import {
   ShieldCheck,
   ShoppingBag,
   SlidersHorizontal,
-  Sparkles,
-  Star,
   Sun,
   UserRound,
   X,
 } from "lucide-react";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { BookingDialog } from "@/components/booking-dialog";
+import { HelpWidget } from "@/components/help-widget";
 import { MarketingSidebar } from "@/components/marketing-sidebar";
 import { ServiceCard } from "@/components/service-card";
 import { Button } from "@/components/ui/button";
 import { handleDialogKeyboard } from "@/lib/keyboard";
 import {
+  formatDate,
   formatMoney,
   initialAppointments,
   initialReferrals,
@@ -56,7 +59,7 @@ const demoData: StoreData = {
   referralCredits: 2,
   vipActive: false,
   welcomeCouponUsed: false,
-  marketingConfig: { newCustomerCoupon: 5, platformCommission: 8 },
+  marketingConfig: { newCustomerCoupon: 5, platformCommission: 8, acquisitionSpend: null },
 };
 
 function isStoreData(value: unknown): value is StoreData {
@@ -85,11 +88,10 @@ export function AgendoPro() {
   const [referralLink, setReferralLink] = useState(`https://agendo.pro/?ref=${DEFAULT_REFERRAL_CODE}`);
   const [toast, setToast] = useState<ToastMessage>(null);
   const [vipOpen, setVipOpen] = useState(false);
+  const [bookingsOpen, setBookingsOpen] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [couponSeconds, setCouponSeconds] = useState(9 * 60 + 59);
-  const [socialProofVisible, setSocialProofVisible] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [bookingSuccess, setBookingSuccess] = useState<Appointment | null>(null);
   const [referralShares, setReferralShares] = useState(0);
 
@@ -102,10 +104,19 @@ export function AgendoPro() {
     try {
       const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
       if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
+      else setTheme(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed: unknown = JSON.parse(saved);
-        if (isStoreData(parsed)) setStore(parsed);
+        if (isStoreData(parsed)) {
+          setStore({
+            ...parsed,
+            marketingConfig: {
+              ...parsed.marketingConfig,
+              acquisitionSpend: parsed.marketingConfig.acquisitionSpend ?? null,
+            },
+          });
+        }
       }
     } catch (error) {
       console.error("No se pudieron leer los datos demo guardados:", error);
@@ -128,25 +139,8 @@ export function AgendoPro() {
   }, [showMessage]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCouponSeconds((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
-
-  useEffect(() => {
-    const showTimer = window.setTimeout(() => setSocialProofVisible(true), 2500);
-    const cycle = window.setInterval(() => {
-      setSocialProofVisible(true);
-      window.setTimeout(() => setSocialProofVisible(false), 7000);
-    }, 24000);
-    return () => {
-      window.clearTimeout(showTimer);
-      window.clearInterval(cycle);
-    };
-  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -183,6 +177,7 @@ export function AgendoPro() {
   const confirmBooking = (booking: {
     customer: string;
     phone: string;
+    email?: string;
     date: string;
     time: string;
     addOn: boolean;
@@ -193,6 +188,7 @@ export function AgendoPro() {
       id: `AG-${Date.now().toString().slice(-6)}`,
       customer: booking.customer,
       phone: booking.phone,
+      email: booking.email,
       shopId: cartService.shopId,
       shopName: cartService.shopName,
       service: `${cartService.service}${booking.addOn ? " + Lavado premium" : ""}`,
@@ -223,7 +219,7 @@ export function AgendoPro() {
       appointments: [appointment, ...current.appointments],
       referrals: referral ? [referral, ...current.referrals] : current.referrals,
       referralCredits: current.referralCredits + (receivedCredits ? 1 : 0),
-      welcomeCouponUsed: current.welcomeCouponUsed || (couponSeconds > 0),
+      welcomeCouponUsed: true,
     }));
     setSelected(null);
     setCartService(null);
@@ -246,7 +242,7 @@ export function AgendoPro() {
   };
 
   const shareReferral = () => {
-    const message = encodeURIComponent(`Reserva tu corte con mi link. Si agendas hoy, yo gano un corte gratis: ${referralLink}`);
+    const message = encodeURIComponent(`Reserva tu corte con mi enlace. Si completas la cita, recibo un crédito de corte gratis: ${referralLink}`);
     window.open(`https://wa.me/?text=${message}`, "_blank", "noopener,noreferrer");
     setReferralShares((count) => Math.min(2, count + 1));
   };
@@ -284,8 +280,6 @@ export function AgendoPro() {
     }
   };
 
-  const couponTime = `${String(Math.floor(couponSeconds / 60)).padStart(2, "0")}:${String(couponSeconds % 60).padStart(2, "0")}`;
-
   const toggleFavorite = (id: string) => {
     setFavorites((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   };
@@ -297,28 +291,41 @@ export function AgendoPro() {
   };
 
   const simulateFriendReferral = () => {
-    if (!bookingSuccess || referralShares < 2 || bookingSuccess.amount === 0) return;
+    if (!bookingSuccess || referralShares < 2) return;
     const referralCode = new URL(referralLink).searchParams.get("ref") || DEFAULT_REFERRAL_CODE;
-    const freeBooking = { ...bookingSuccess, amount: 0 };
+    const completedAt = new Date().toISOString().slice(0, 10);
+    const referredAppointment: Appointment = {
+      id: `AG-${Date.now().toString().slice(-6)}`,
+      customer: "Amigo invitado (demo)",
+      phone: `demo-${Date.now()}`,
+      shopId: bookingSuccess.shopId,
+      shopName: bookingSuccess.shopName,
+      service: bookingSuccess.service,
+      date: completedAt,
+      time: bookingSuccess.time,
+      amount: bookingSuccess.amount,
+      status: "Completada",
+      referralCode,
+      createdAt: completedAt,
+    };
     const conversion: Referral = {
       id: `ref-${Date.now()}`,
       customer: "Amigo invitado (demo)",
       code: referralCode,
-      shopId: bookingSuccess.shopId,
-      shopName: bookingSuccess.shopName,
-      date: new Date().toISOString().slice(0, 10),
+      shopId: referredAppointment.shopId,
+      shopName: referredAppointment.shopName,
+      date: completedAt,
       status: "Recompensado",
-      reward: "Cita actual bonificada",
+      reward: "1 crédito de corte gratis",
     };
     setStore((current) => ({
       ...current,
-      appointments: current.appointments.map((appointment) =>
-        appointment.id === bookingSuccess.id ? freeBooking : appointment),
+      appointments: [referredAppointment, ...current.appointments],
       referrals: [conversion, ...current.referrals],
       referralCredits: current.referralCredits + 1,
     }));
-    setBookingSuccess(freeBooking);
-    showMessage("¡Corte gratis desbloqueado!", "La cita quedó bonificada en esta simulación. No se realizó ningún cobro ni reembolso.");
+    setReferralShares(0);
+    showMessage("Crédito de corte disponible", "La cita completada del amigo se simuló y el crédito quedó registrado. No se realizó ningún cobro.");
   };
 
   if (view === "admin") {
@@ -334,12 +341,12 @@ export function AgendoPro() {
   }
 
   return (
-    <div data-theme={theme} className={`${theme === "dark" ? "theme-dark" : "theme-light"} min-h-screen bg-[#0b0f17] text-white`}>
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-gradient-to-r from-[#5e1918] via-[#8b3c18] to-[#5e1918] px-3 py-2.5 text-center text-[10px] font-semibold text-white sm:text-xs">
-        <Sparkles aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
-        <span>{store.welcomeCouponUsed ? "Tu cupón de bienvenida ya fue utilizado." : <>¡Atención! Tu cupón demo de <b className="text-amber-300">{formatMoney(store.marketingConfig.newCustomerCoupon)}</b> en tu primera reserva vence en</>}</span>
-        <span role="timer" aria-label={store.welcomeCouponUsed ? "Cupón utilizado" : `Cupón vence en ${couponTime}`} className="rounded-md border border-amber-300/40 bg-black/20 px-2 py-0.5 font-mono font-extrabold text-amber-300">{store.welcomeCouponUsed ? "USADO" : couponSeconds > 0 ? couponTime : "00:00"}</span>
-        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-white/80">{store.welcomeCouponUsed ? "GRACIAS" : couponSeconds > 0 ? "DEMO" : "Cupón demo expirado"}</span>
+    <div data-theme={theme} className={`${theme === "dark" ? "theme-dark" : "theme-light"} min-h-screen bg-[var(--azulejo)] text-[var(--tinta)]`}>
+      <a href="#main-content" className="skip-link">Saltar al contenido</a>
+      <div className="flex min-h-11 flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-[var(--poste-azul)] px-3 py-2 text-center text-xs font-semibold text-white">
+        <Gift aria-hidden="true" className="h-4 w-4" />
+        <span>{store.welcomeCouponUsed ? "Cupón demo de bienvenida utilizado." : <>Cupón demo disponible: <b>{formatMoney(store.marketingConfig.newCustomerCoupon)}</b> en tu primera reserva. No tiene temporizador.</>}</span>
+        {!store.welcomeCouponUsed && <span className="rounded-full border border-white/30 px-2 py-0.5 text-[10px]">DEMO</span>}
       </div>
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] items-center gap-3 px-3 py-3 sm:gap-5 sm:px-7">
@@ -352,12 +359,12 @@ export function AgendoPro() {
           <form onSubmit={(event) => { event.preventDefault(); document.getElementById("reservas")?.scrollIntoView({ behavior: "smooth" }); }} className="flex min-w-0 flex-1">
             <div className="flex w-full overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:border-leaf focus-within:ring-2 focus-within:ring-green-100">
               <div className="hidden items-center border-r border-gray-100 bg-gray-50 px-3 text-[10px] font-semibold text-muted sm:flex">Servicios <ChevronDown className="ml-1 h-3 w-3" /></div>
-              <input aria-label="Buscar servicios o barberías" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Busca un corte, barba o barbería..." className="min-w-0 flex-1 px-3 py-2.5 text-xs outline-none sm:text-sm" />
+              <input id="market-search" aria-label="Buscar servicios o barberías" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Busca un corte, barba o barbería..." className="min-w-0 flex-1 px-3 py-2.5 text-xs outline-none sm:text-sm" />
               <button type="submit" aria-label="Buscar" className="flex w-11 items-center justify-center bg-leaf text-white hover:bg-[#26442e]"><Search className="h-4 w-4" /></button>
             </div>
           </form>
           <button onClick={toggleTheme} aria-label={`Cambiar a modo ${theme === "dark" ? "claro" : "oscuro"}`} title={`Cambiar a modo ${theme === "dark" ? "claro" : "oscuro"}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-100">{theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-ink" />}</button>
-          <button onClick={() => setVipOpen(true)} className="hidden items-center gap-2 rounded-xl px-2 py-2 text-left hover:bg-gray-50 md:flex"><UserRound className="h-5 w-5" /><span><small className="block text-[9px] text-muted">Hola, Juan</small><b className="text-xs">{store.vipActive ? "Pase VIP activo" : "Mi cuenta"}</b></span><ChevronDown className="h-3 w-3 text-muted" /></button>
+          <button onClick={() => setVipOpen(true)} className="hidden items-center gap-2 rounded-xl px-2 py-2 text-left hover:bg-gray-50 md:flex"><UserRound className="h-5 w-5" /><span><small className="block text-[9px] text-muted">Tu cuenta demo</small><b className="text-xs">{store.vipActive ? "Pase VIP activo" : "Mi cuenta"}</b></span><ChevronDown className="h-3 w-3 text-muted" /></button>
           <button onClick={() => cartService ? setSelected(cartService) : showMessage("Tu carrito está vacío", "Elige un servicio y reserva en unos pocos pasos.", "error")} aria-label="Abrir carrito" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl hover:bg-gray-100"><ShoppingBag className="h-5 w-5" />{cartService && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-copper text-[9px] font-bold text-white">1</span>}</button>
           <Button size="sm" variant="outline" className="hidden lg:inline-flex" onClick={() => setView("admin")}>Admin <ArrowUpRight className="h-3.5 w-3.5" /></Button>
         </div>
@@ -373,27 +380,26 @@ export function AgendoPro() {
         </div>}
       </header>
 
-      <main className="mx-auto max-w-[1440px] px-3 pb-12 sm:px-7">
-        <section className="hero-panel relative mt-4 overflow-hidden rounded-3xl border border-blue-400/20 sm:mt-6">
+      <main id="main-content" className="mx-auto max-w-[1440px] px-3 pb-28 sm:px-7 sm:pb-12">
+        <section className="hero-panel relative mt-4 overflow-hidden rounded-xl border border-gray-200 sm:mt-6">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_45%,rgba(59,130,246,.2),transparent_38%)]" />
           <div className="relative grid min-h-[330px] items-center gap-5 p-5 sm:min-h-[380px] sm:p-9 lg:grid-cols-[1.1fr_.9fr] lg:px-14">
             <div className="max-w-xl">
-              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-blue-400/25 bg-blue-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-300"><ShieldCheck className="h-3.5 w-3.5" /> Reserva segura · Paga en barbería</div>
-              <h1 className="mb-3 text-3xl font-black leading-[1.03] tracking-tight sm:text-5xl">Sube de nivel tu imagen.<br /><span className="text-blue-400">Garantiza tu lugar</span> sin filas.</h1>
-              <p className="mb-5 max-w-md text-xs leading-5 text-gray-300 sm:text-sm sm:leading-6">Únete al VIP Club o reserva tu cita hoy con beneficio exclusivo. Tu primera reserva incluye un cupón demo de {formatMoney(store.marketingConfig.newCustomerCoupon)}.</p>
+              <div className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3 text-xs font-semibold text-leaf"><ShieldCheck className="h-4 w-4" /> Horarios de muestra · Pago en barbería</div>
+              <h1 className="mb-3 text-3xl font-black leading-[1.03] tracking-tight sm:text-5xl">Reserva tu próximo corte.<br /><span className="text-[var(--poste-rojo)]">Sin filas ni llamadas.</span></h1>
+              <p className="mb-5 max-w-md text-base leading-6 text-muted">Explora barberías, compara servicios y elige un horario. La reserva se confirma en esta demostración local.</p>
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-300"><Star className="h-3 w-3 fill-amber-300" /> 4.9/5 · +1,200 reseñas de ejemplo</span>
-                <span className="rounded-full bg-white/5 px-2 py-1.5 text-[9px] text-gray-400">Datos de demostración, no reseñas verificadas</span>
+                <span className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><Clock3 className="h-4 w-4 text-leaf" /> Horarios y precios de ejemplo</span>
               </div>
-              <div className="flex flex-wrap gap-2"><Button variant="default" className="cta-glow h-12 bg-[#3B82F6] px-5 font-extrabold text-white hover:bg-blue-500" onClick={() => document.getElementById("reservas")?.scrollIntoView({ behavior: "smooth" })}>Reservar Cita Ahora (Descuento Aplicado) <ArrowRight className="h-4 w-4" /></Button><Button variant="outline" onClick={() => setVipOpen(true)}><Gift className="h-4 w-4 text-amber-300" /> Explorar VIP Club</Button></div>
-              <div className="mt-5 flex flex-wrap items-center gap-3 text-[10px] font-medium text-gray-300 sm:gap-5"><span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-emerald-300" /> Confirmación inmediata</span><span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-emerald-300" /> Sin pago anticipado</span></div>
+              <div className="flex flex-wrap gap-2"><Button variant="primary" size="lg" onClick={() => document.getElementById("reservas")?.scrollIntoView({ behavior: "smooth" })}>Reservar ahora <ArrowRight className="h-4 w-4" /></Button><Button variant="outline" onClick={() => setVipOpen(true)}>Conocer Pase VIP</Button></div>
+              <div className="mt-5 flex flex-wrap items-center gap-3 text-xs font-medium text-muted sm:gap-5"><span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[var(--ok)]" /> Confirmación en la demo</span><span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[var(--ok)]" /> Sin cobro en línea</span></div>
             </div>
             <div className="hidden h-full min-h-[230px] items-center justify-center lg:flex">
               <div className="relative h-[260px] w-full max-w-[480px]">
                 <div className="shop-image absolute right-0 top-0 h-[235px] w-[79%] rounded-3xl border border-white/10 shadow-soft" style={{ backgroundImage: "linear-gradient(180deg,rgba(11,15,23,.02),rgba(11,15,23,.25)),url(https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=900&q=85)" }} />
                 <div className="absolute bottom-0 left-0 rounded-2xl border border-white/10 bg-[#151b27]/95 p-4 shadow-soft">
-                  <div className="mb-1 flex items-center gap-2 text-[10px] font-bold text-blue-300"><span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/20">✂</span> BARBERÍA DESTACADA · DEMO</div>
-                  <div className="text-sm font-extrabold">Casa Navaja · Roma Norte</div><div className="mt-1 flex items-center gap-1 text-[10px] text-gray-300"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> 4.9 · 1,200 reseñas de ejemplo · Desde {formatMoney(15)}</div>
+                  <div className="mb-1 flex items-center gap-2 text-xs font-bold text-leaf"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-canvas">✂</span> BARBERÍA DE EJEMPLO</div>
+                  <div className="text-sm font-extrabold">Casa Navaja · Roma Norte</div><div className="mt-1 text-xs text-muted">Servicios desde {formatMoney(15)} · datos de demostración</div>
                 </div>
               </div>
             </div>
@@ -401,21 +407,21 @@ export function AgendoPro() {
         </section>
 
         <div className="mb-6 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-400/25 bg-amber-400/5 px-4 py-3 sm:mt-5 sm:px-5">
-          <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><Gift className="h-4 w-4" /></span><div><b className="block text-xs sm:text-sm">Comparte tu link con 2 amigos. El corte puede ir por la casa.</b><span className="text-[10px] text-gray-400 sm:text-xs">Si uno agenda hoy, se registra un corte gratis para ti · Recompensa simulada.</span></div></div>
-          <button onClick={shareReferral} className="shrink-0 rounded-lg bg-[#3B82F6] px-3 py-2 text-[10px] font-bold text-white hover:bg-blue-500 sm:px-4 sm:text-xs">Compartir link ↗</button>
+          <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-canvas text-[var(--poste-azul)]"><Gift className="h-4 w-4" /></span><div><b className="block text-sm">Comparte tu enlace de referido.</b><span className="text-xs text-muted">El crédito demo se registra cuando la cita del invitado aparece como completada.</span></div></div>
+          <button onClick={shareReferral} className="min-h-11 shrink-0 rounded-lg bg-[var(--poste-azul)] px-4 py-2 text-xs font-bold text-white">Compartir enlace</button>
         </div>
 
         <section id="reservas" className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0">
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-              <div><p className="mb-1 text-[10px] font-extrabold uppercase tracking-[.18em] text-blue-300">Marketplace de barberías</p><h2 className="mb-1 text-xl font-extrabold tracking-tight sm:text-2xl">Servicios & ofertas</h2><p className="mb-0 text-xs text-gray-400">Precios especiales en tu primera visita · {filteredServices.length} resultados demo</p></div>
+              <div><p className="mb-1 text-xs font-semibold text-leaf">Marketplace de barberías</p><h2 className="mb-1 text-xl font-extrabold tracking-tight sm:text-2xl">Servicios destacados</h2><p className="mb-0 text-sm text-muted">{filteredServices.length} servicios · precios y valoraciones de ejemplo</p></div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted"><SlidersHorizontal className="h-3.5 w-3.5" />Ordenar:</div>
                 <select aria-label="Ordenar servicios" value={sort} onChange={(e) => setSort(e.target.value)} className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-[10px] font-semibold outline-none focus:border-leaf"><option>Recomendados</option><option>Precio más bajo</option><option>Mejor valorados</option></select>
               </div>
             </div>
             <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-              {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-[10px] font-bold transition ${category === item ? "border-ink bg-ink text-white" : "border-gray-200 bg-white text-gray-600 hover:border-leaf"}`}>{item === "Todo" ? "Todo" : item === "Combo" ? "Combos y ofertas" : item}</button>)}
+              {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition ${category === item ? "border-ink bg-ink text-white" : "border-gray-200 bg-white text-gray-600 hover:border-leaf"}`}>{item === "Todo" ? "Todo" : item === "Combo" ? "Combos y ofertas" : item}</button>)}
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filteredServices.map((item) => <div key={item.id} className="relative">
@@ -424,23 +430,38 @@ export function AgendoPro() {
               </div>)}
               {!filteredServices.length && <div className="col-span-full rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center"><CircleHelp className="mx-auto mb-2 h-6 w-6 text-muted" /><p className="mb-1 text-sm font-bold">No encontramos servicios</p><p className="mb-0 text-xs text-muted">Prueba con otro término o categoría.</p></div>}
             </div>
-            <section className="mt-6 overflow-hidden rounded-2xl border border-blue-400/20 bg-[#111827] p-5 text-white sm:p-7">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div className="max-w-lg"><div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-bold text-blue-300"><BadgePercent className="h-3.5 w-3.5" /> VIP CLUB · 3 CUPOS DEMO</div><h2 className="mb-2 text-xl font-extrabold">Cortes ilimitados. Sábados sin espera.</h2><p className="mb-0 text-xs leading-5 text-gray-300">Paga por cita {formatMoney(15)}–{formatMoney(25)} o únete al VIP Club por {formatMoney(39)}/mes.</p></div><Button variant="default" className="bg-[#3B82F6] hover:bg-blue-500" onClick={() => setVipOpen(true)}>Ver membresía · {formatMoney(39)}/mes <ArrowUpRight className="h-4 w-4" /></Button></div>
+            <section className="mt-8 rounded-xl border border-gray-200 bg-white p-5 sm:p-7">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div className="max-w-lg"><div className="mb-2 inline-flex min-h-11 items-center gap-2 rounded-lg bg-canvas px-3 text-xs font-semibold text-[var(--laton)]"><BadgePercent className="h-4 w-4" /> Membresía de demostración</div><h2 className="mb-2 text-xl font-extrabold">Pase VIP para visitas frecuentes</h2><p className="mb-0 text-sm leading-6 text-muted">Compara tus visitas habituales con el precio de ejemplo de {formatMoney(39)}/mes. Los beneficios y cobros no están conectados.</p></div><Button variant="outline" onClick={() => setVipOpen(true)}>Ver plan y condiciones <ArrowUpRight className="h-4 w-4" /></Button></div>
             </section>
           </div>
-          <div className="min-w-0"><MarketingSidebar referralLink={referralLink} credits={store.referralCredits} onVIP={() => setVipOpen(true)} onCopy={copyReferralLink} onInstagram={shareInstagram} /></div>
+          <div className="min-w-0"><MarketingSidebar
+            referralLink={referralLink}
+            credits={store.referralCredits}
+            completedCount={store.referrals.filter((referral) => referral.code === new URL(referralLink).searchParams.get("ref") && referral.status !== "Pendiente").length}
+            onVIP={() => setVipOpen(true)}
+            onCopy={copyReferralLink}
+            onShare={shareReferral}
+            onInstagram={shareInstagram}
+          /></div>
         </section>
       </main>
 
       <footer className="border-t border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-[1440px] flex-col justify-between gap-2 px-4 py-5 text-[10px] text-muted sm:flex-row sm:px-7"><span><b className="text-ink">agendo pro</b> · Una buena barbería se siente.</span><span>Prototipo interactivo · Sin cobros reales · <button onClick={() => setView("admin")} className="font-semibold text-leaf hover:underline">Panel de administrador ↗</button></span></div>
+        <div className="mx-auto flex max-w-[1440px] flex-col justify-between gap-2 px-4 py-5 text-xs text-muted sm:flex-row sm:px-7"><span><b className="text-ink">Agendo Pro</b> · Una buena barbería se siente.</span><span>Prototipo local · Sin cobros reales · <button onClick={() => setView("admin")} className="min-h-11 font-semibold text-leaf hover:underline">Panel de administrador ↗</button></span></div>
       </footer>
+
+      <nav aria-label="Navegación móvil" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-gray-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur lg:hidden">
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-semibold"><Home className="h-5 w-5" />Inicio</button>
+        <button type="button" onClick={() => { document.getElementById("market-search")?.focus(); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-semibold"><Search className="h-5 w-5" />Buscar</button>
+        <button type="button" onClick={() => setBookingsOpen(true)} className="flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-semibold"><CalendarDays className="h-5 w-5" />Mis citas</button>
+        <button type="button" onClick={() => setVipOpen(true)} className="flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-semibold"><UserRound className="h-5 w-5" />Perfil</button>
+      </nav>
 
       {selected && cartService && <BookingDialog
         item={cartService}
         referralCode={incomingReferral}
         referralLink={referralLink}
-        couponActive={couponSeconds > 0 && !store.welcomeCouponUsed}
+        couponActive={!store.welcomeCouponUsed}
         couponAmount={store.marketingConfig.newCustomerCoupon}
         onClose={closeBooking}
         onShare={shareReferral}
@@ -448,25 +469,24 @@ export function AgendoPro() {
         onConfirm={confirmBooking}
       />}
       {bookingSuccess && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setBookingSuccess(null); }}>
-        <div role="dialog" aria-modal="true" aria-labelledby="success-title" onKeyDown={(event) => handleDialogKeyboard(event, () => setBookingSuccess(null))} className="relative w-full max-w-md rounded-3xl border border-emerald-400/25 bg-[#111925] p-6 text-white shadow-2xl sm:p-8">
+        <div role="dialog" aria-modal="true" aria-labelledby="success-title" onKeyDown={(event) => handleDialogKeyboard(event, () => setBookingSuccess(null))} className="relative w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 text-ink shadow-2xl sm:p-8">
           <button aria-label="Cerrar confirmación de reserva" onClick={() => setBookingSuccess(null)} className="absolute right-4 top-4 rounded-lg p-2 text-gray-400 hover:bg-white/10"><X className="h-4 w-4" /></button>
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300"><Check className="h-6 w-6" /></div>
-          <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[.17em] text-emerald-300">Reserva demo confirmada · {bookingSuccess.id}</p>
+          <p className="mb-1 text-xs font-semibold text-[var(--ok)]">Reserva confirmada en la demo · {bookingSuccess.id}</p>
           <h2 id="success-title" className="mb-2 text-2xl font-extrabold">¡Listo, {bookingSuccess.customer}!</h2>
-          <p className="mb-4 text-sm leading-6 text-gray-300">{bookingSuccess.service} en {bookingSuccess.shopName}. Total con cupón: <b className="text-amber-300">{formatMoney(bookingSuccess.amount)}</b>. No se realizó ningún cobro.</p>
-          <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
-            <div className="mb-1 flex items-center gap-2 text-sm font-extrabold text-amber-300"><Gift className="h-4 w-4" />¿Quieres este corte GRATIS?</div>
-            <p className="mb-3 text-xs leading-5 text-gray-300">Comparte tu link único con 2 amigos. Si uno agenda hoy, tu corte actual queda 100% gratis como recompensa demo; no se procesa ningún pago ni reembolso real.</p>
-            <div className="mb-3 flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full bg-emerald-400 transition-all ${referralShares >= 2 ? "w-full" : referralShares === 1 ? "w-1/2" : "w-0"}`} /></div><span className="text-[10px] font-bold text-emerald-300">{referralShares}/2</span></div>
-            <code className="block truncate rounded-lg bg-black/30 px-3 py-2 text-[10px] text-emerald-300">{referralLink}</code>
+          <p className="mb-4 text-sm leading-6 text-muted">{bookingSuccess.service} en {bookingSuccess.shopName}. Total demo: <b>{formatMoney(bookingSuccess.amount)}</b>. No se realizó ningún cobro.</p>
+          <div className="rounded-xl border border-gray-200 bg-canvas p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm font-extrabold"><Gift className="h-4 w-4 text-[var(--poste-rojo)]" />Comparte tu enlace de referido</div>
+            <p className="mb-3 text-xs leading-5 text-muted">Cuando la cita del invitado se complete, se registra un crédito de corte gratis para ti. Esta acción de abajo solo simula ese evento.</p>
+            <code className="block min-h-11 truncate rounded-lg border border-gray-200 bg-white px-3 py-3 text-xs text-muted">{referralLink}</code>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button size="sm" variant="lime" onClick={shareReferral}><span aria-hidden="true">◉</span> WhatsApp</Button>
-              <Button size="sm" variant="outline" onClick={shareInstagram}><Instagram className="h-4 w-4" /> Instagram Stories</Button>
+              <Button size="sm" variant="primary" onClick={shareReferral}><span aria-hidden="true">◉</span> WhatsApp</Button>
+              <Button size="sm" variant="outline" onClick={shareInstagram}><Instagram className="h-4 w-4" /> Compartir</Button>
             </div>
-            <Button className="mt-3 w-full" size="sm" variant="default" disabled={referralShares < 2 || bookingSuccess.amount === 0} onClick={simulateFriendReferral}>
-              {bookingSuccess.amount === 0 ? "Corte gratis activado" : referralShares < 2 ? `Comparte con 2 amigos · ${referralShares}/2` : "Simular reserva de un amigo hoy"}
+            <Button className="mt-3 w-full" size="sm" variant="outline" disabled={referralShares < 2} onClick={simulateFriendReferral}>
+              {referralShares < 2 ? `Comparte el enlace 2 veces para probar · ${referralShares}/2` : "Simular cita completada del invitado"}
             </Button>
-            <p className="mb-0 mt-2 text-center text-[9px] text-gray-500">Botón de prueba: en producción esta acción ocurre al confirmar una cita real.</p>
+            <p className="mb-0 mt-2 text-xs text-muted">El contador es una prueba local; no representa personas ni reservas reales.</p>
           </div>
           <Button variant="primary" className="mt-4 w-full" onClick={() => setBookingSuccess(null)}>Continuar <ArrowRight className="h-4 w-4" /></Button>
         </div>
@@ -474,20 +494,24 @@ export function AgendoPro() {
       {vipOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setVipOpen(false); }}>
         <div role="dialog" aria-modal="true" aria-labelledby="vip-title" onKeyDown={(event) => handleDialogKeyboard(event, () => setVipOpen(false))} className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
           <button aria-label="Cerrar" onClick={() => setVipOpen(false)} className="absolute right-4 top-4 rounded-lg p-2 text-muted hover:bg-gray-100"><X className="h-4 w-4" /></button>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-2xl text-blue-300">♛</div>
-          <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[.17em] text-blue-300">Solo 3 cupos disponibles · demo</p><h2 id="vip-title" className="mb-2 text-2xl font-extrabold">VIP Club ilimitado</h2>
-          <p className="mb-5 text-sm leading-6 text-gray-300">Garantiza tu horario los sábados sin esperar y disfruta cortes ilimitados por {formatMoney(39)}/mes. Cupos y plan son simulados.</p>
-          <div className="mb-5 rounded-2xl bg-canvas p-4"><div className="flex items-end justify-between"><span className="text-xs text-muted">Suscripción mensual</span><b className="text-2xl">{formatMoney(39)}<small className="text-xs font-medium text-muted"> / mes</small></b></div><div className="mt-1 flex items-center justify-between text-[10px] text-muted"><span>Precio individual de referencia</span><span className="line-through">{formatMoney(25)} por corte</span></div><ul className="mb-0 mt-3 space-y-2 text-xs"><li className="flex gap-2"><Check className="h-4 w-4 text-emerald-300" />Cortes ilimitados en Casa Navaja</li><li className="flex gap-2"><Check className="h-4 w-4 text-blue-300" />Horario prioritario los sábados</li><li className="flex gap-2"><Check className="h-4 w-4 text-blue-300" />Cancela cuando quieras (simulado)</li></ul></div>
-          <Button variant="default" className="w-full bg-[#3B82F6] hover:bg-blue-500" disabled={store.vipActive} onClick={enrollVip}>{store.vipActive ? "Pase VIP activo (demo)" : "Unirme al VIP Club · $39/mes"} <ArrowRight className="h-4 w-4" /></Button>
-          <p className="mb-0 mt-3 text-center text-[10px] text-gray-400">Esta demo no almacena datos de pago ni genera cargos.</p>
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-canvas text-xl text-[var(--laton)]">♛</div>
+          <p className="mb-1 text-xs font-semibold text-[var(--laton)]">Membresía de demostración</p><h2 id="vip-title" className="mb-2 text-2xl font-extrabold">Pase VIP</h2>
+          <p className="mb-5 text-sm leading-6 text-muted">Precio de muestra de {formatMoney(39)}/mes. Revisa las condiciones comerciales reales antes de activar una suscripción.</p>
+          <div className="mb-5 rounded-xl border border-gray-200 bg-canvas p-4"><div className="flex items-end justify-between"><span className="text-sm text-muted">Cuota mensual demo</span><b className="text-2xl tabular-nums">{formatMoney(39)}</b></div><ul className="mb-0 mt-3 space-y-2 text-sm"><li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-[var(--ok)]" />Beneficios ilustrativos, sujetos a configuración</li><li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-[var(--ok)]" />Sin guardar datos de pago</li><li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-[var(--ok)]" />Puedes cancelar la prueba en un toque</li></ul></div>
+          {store.vipActive
+            ? <Button variant="outline" className="w-full" onClick={() => { setStore((current) => ({ ...current, vipActive: false })); setVipOpen(false); showMessage("Prueba VIP cancelada", "No se genera ningún cobro."); }}>Cancelar membresía</Button>
+            : <Button variant="primary" className="w-full" onClick={enrollVip}>Activar prueba VIP <ArrowRight className="h-4 w-4" /></Button>}
+          <p className="mb-0 mt-3 text-center text-xs text-muted">La membresía no realiza cargos recurrentes en esta demo.</p>
         </div>
       </div>}
-      {socialProofVisible && <div role="status" aria-live="polite" className="fixed bottom-4 left-3 z-40 flex max-w-[calc(100%-1.5rem)] items-start gap-3 rounded-2xl border border-blue-400/25 bg-[#111925] p-3 pr-9 text-white shadow-2xl sm:bottom-5 sm:left-5 sm:max-w-sm">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-blue-300"><Check className="h-4 w-4" /></span>
-        <div className="min-w-0"><span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-blue-300">Actividad social · simulación</span><p className="mb-0 text-[11px] leading-4"><b>Carlos M. (demo)</b> acaba de reservar su Combo VIP hace 3 minutos.</p></div>
-        <button aria-label="Cerrar aviso de actividad" onClick={() => setSocialProofVisible(false)} className="absolute right-2 top-2 rounded-md p-1 text-gray-400 hover:bg-white/10"><X className="h-3.5 w-3.5" /></button>
+      {bookingsOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setBookingsOpen(false); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="bookings-title" onKeyDown={(event) => handleDialogKeyboard(event, () => setBookingsOpen(false))} className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-white p-5 text-ink sm:rounded-xl">
+          <div className="mb-4 flex items-center justify-between"><div><h2 id="bookings-title" className="mb-1 text-lg font-bold">Mis citas</h2><p className="mb-0 text-xs text-muted">Reservas de demostración guardadas localmente.</p></div><button type="button" aria-label="Cerrar mis citas" onClick={() => setBookingsOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-canvas"><X className="h-5 w-5" /></button></div>
+          {store.appointments.length ? <div className="divide-y divide-gray-100">{store.appointments.slice(0, 6).map((appointment) => <article key={appointment.id} className="flex items-start justify-between gap-3 py-3"><div><h3 className="mb-1 text-sm font-semibold">{appointment.service}</h3><p className="mb-0 text-xs text-muted">{appointment.shopName} · {formatDate(appointment.date)} · {appointment.time}</p><p className="mb-0 mt-1 text-xs text-muted">Estado: {appointment.status}</p></div><b className="shrink-0 text-sm tabular-nums">{formatMoney(appointment.amount)}</b></article>)}</div> : <div className="rounded-lg bg-canvas p-4"><b className="text-sm">Aún no tienes citas.</b><p className="mb-0 mt-1 text-xs text-muted">Reserva la primera para empezar tu poste.</p></div>}
+        </section>
       </div>}
-      {toast && <div role="status" className={`fixed bottom-4 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border p-4 shadow-2xl ${toast.tone === "error" ? "border-red-400/30 bg-[#111925]" : "border-emerald-400/30 bg-[#111925]"}`}><div className="flex items-start gap-3"><span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${toast.tone === "error" ? "bg-red-500/10 text-red-400" : "bg-emerald-400/10 text-emerald-300"}`}>{toast.tone === "error" ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}</span><div className="flex-1"><b className="block text-sm">{toast.title}</b><span className="text-xs text-gray-300">{toast.detail}</span></div><button aria-label="Cerrar notificación" onClick={() => setToast(null)} className="text-gray-400"><X className="h-4 w-4" /></button></div></div>}
+      {toast && <div role="status" className={`fixed bottom-20 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border bg-white p-4 text-ink shadow-xl sm:bottom-5 ${toast.tone === "error" ? "border-red-400/30" : "border-green-400/30"}`}><div className="flex items-start gap-3"><span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${toast.tone === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{toast.tone === "error" ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}</span><div className="flex-1"><b className="block text-sm">{toast.title}</b><span className="text-xs text-muted">{toast.detail}</span></div><button aria-label="Cerrar notificación" onClick={() => setToast(null)} className="flex h-11 w-11 items-center justify-center text-muted"><X className="h-4 w-4" /></button></div></div>}
+      <HelpWidget />
       <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Volver arriba" className="fixed bottom-5 right-4 z-20 hidden h-10 w-10 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-lime sm:flex"><ArrowDown className="h-4 w-4 rotate-180" /></button>
     </div>
   );

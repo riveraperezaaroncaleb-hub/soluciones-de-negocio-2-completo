@@ -6,19 +6,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#172019",
-        leaf: "#33533b",
-        lime: "#d8ee9b",
-        copper: "#b96843",
-        canvas: "#f6f7f4",
-        muted: "#748078",
+        ink: "var(--tinta)",
+        leaf: "var(--poste-azul)",
+        lime: "var(--azulejo)",
+        copper: "var(--laton)",
+        canvas: "var(--capa)",
+        muted: "var(--cromo)",
       },
       boxShadow: {
         soft: "0 8px 30px rgba(21, 33, 24, 0.07)",
       },
-      fontFamily: {
-        sans: ["Arial", "Helvetica", "sans-serif"],
-      },
+      fontFamily: { sans: ["Arial", "Helvetica", "sans-serif"] },
     },
   },
   plugins: [],

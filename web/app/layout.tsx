@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agendo Pro | Encuentra tu próxima barbería",
-  description: "Reserva tu próximo corte, descubre ofertas y gana cortes gratis invitando amigos.",
+  title: "Agendo Pro | Reserva tu barbería",
+  description: "Encuentra servicios de barbería, reserva tu cita y comparte beneficios con amigos.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

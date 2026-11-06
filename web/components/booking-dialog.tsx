@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, Check, Clock3, Gift, Instagram, Minus, Plus, Scissors, Sparkles, Users, X } from "lucide-react";
+import type { CSSProperties } from "react";
+import { CalendarDays, Check, Clock3, Gift, Instagram, Scissors, Sparkles, Users, X } from "lucide-react";
 import type { BarberService } from "@/lib/data";
 import { formatMoney } from "@/lib/data";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ type BookingDialogProps = {
   onConfirm: (booking: {
     customer: string;
     phone: string;
+    email?: string;
     date: string;
     time: string;
     addOn: boolean;
@@ -35,7 +37,7 @@ const times = ["09:30", "10:30", "11:30", "12:30", "14:00", "15:30", "17:00"];
 
 export function BookingDialog({ item, referralCode, referralLink, couponActive, couponAmount, onClose, onShare, onInstagram, onConfirm }: BookingDialogProps) {
   const [customer, setCustomer] = useState("");
-  const [phone, setPhone] = useState("");
+  const [contact, setContact] = useState("");
   const [date, setDate] = useState(dates[0].toISOString().slice(0, 10));
   const [time, setTime] = useState(times[2]);
   const [addOn, setAddOn] = useState(false);
@@ -47,11 +49,21 @@ export function BookingDialog({ item, referralCode, referralLink, couponActive, 
 
   const confirm = (event: React.FormEvent) => {
     event.preventDefault();
-    if (customer.trim().length < 2 || phone.replace(/\D/g, "").length < 10) {
-      setError("Ingresa tu nombre y un teléfono de 10 dígitos para confirmar.");
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.trim());
+    const isPhone = contact.replace(/\D/g, "").length >= 10;
+    if (customer.trim().length < 2 || (!isEmail && !isPhone)) {
+      setError("Ingresa tu nombre y un correo válido o teléfono de al menos 10 dígitos.");
       return;
     }
-    onConfirm({ customer: customer.trim(), phone: phone.trim(), date, time, addOn, total: Math.max(0, total - discount) });
+    onConfirm({
+      customer: customer.trim(),
+      phone: isPhone ? contact.trim() : "",
+      email: isEmail ? contact.trim() : undefined,
+      date,
+      time,
+      addOn,
+      total: Math.max(0, total - discount),
+    });
   };
 
   return (
@@ -65,9 +77,9 @@ export function BookingDialog({ item, referralCode, referralLink, couponActive, 
         </div>
         <form onSubmit={confirm} className="space-y-5 p-5 sm:p-7">
           <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-3.5">
-            <div className="mb-2 flex items-center justify-between gap-2 text-xs"><b className="inline-flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-blue-300" />Tu progreso VIP</b><span className="font-bold text-blue-300">{customer.trim().length > 1 && phone.replace(/\D/g, "").length >= 10 ? "¡Listo para desbloquear!" : "2 de 3 pasos"}</span></div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full bg-blue-400 transition-all ${customer.trim().length > 1 && phone.replace(/\D/g, "").length >= 10 ? "w-full" : "w-2/3"}`} /></div>
-            <p className="mb-0 mt-2 text-[10px] text-gray-300">Estás a 1 paso de desbloquear tu tratamiento facial de bienvenida.</p>
+            <div className="mb-2 flex items-center justify-between gap-2 text-xs"><b className="inline-flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-leaf" />Tu progreso de reserva</b><span className="font-bold text-leaf">{customer.trim().length > 1 && contact.trim() ? "2 de 2 pasos" : "1 de 2 pasos"}</span></div>
+            <div className="poste h-3 overflow-hidden rounded-full" role="progressbar" aria-valuenow={customer.trim().length > 1 && contact.trim() ? 2 : 1} aria-valuemin={0} aria-valuemax={2} aria-label="Progreso para completar la reserva" style={{ "--p": customer.trim().length > 1 && contact.trim() ? "100%" : "50%" } as CSSProperties & { "--p": string }} />
+            <p className="mb-0 mt-2 text-xs text-muted">Elige el horario y confirma tus datos para terminar.</p>
           </div>
 
           <div className="flex gap-3 rounded-2xl bg-canvas p-3.5">
@@ -82,7 +94,7 @@ export function BookingDialog({ item, referralCode, referralLink, couponActive, 
               {dates.map((day) => {
                 const key = day.toISOString().slice(0, 10);
                 const selected = date === key;
-                return <button type="button" key={key} onClick={() => setDate(key)} className={`rounded-xl border p-2 text-center ${selected ? "border-leaf bg-leaf text-white" : "border-gray-200 hover:border-leaf"}`}>
+                return <button type="button" key={key} onClick={() => setDate(key)} className={`min-h-11 rounded-lg border p-2 text-center ${selected ? "border-leaf bg-leaf text-white" : "border-gray-200 hover:border-leaf"}`}>
                   <span className="block text-[10px] uppercase">{new Intl.DateTimeFormat("es-MX", { weekday: "short" }).format(day).replace(".", "")}</span>
                   <b className="text-base">{day.getDate()}</b>
                 </button>;
@@ -93,22 +105,21 @@ export function BookingDialog({ item, referralCode, referralLink, couponActive, 
           <section>
             <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted"><Clock3 className="h-4 w-4" /> Horarios disponibles</label>
             <div className="grid grid-cols-4 gap-2">
-              {times.map((slot) => <button type="button" key={slot} onClick={() => setTime(slot)} className={`rounded-lg border px-2 py-2 text-xs font-semibold ${time === slot ? "border-leaf bg-green-50 text-leaf" : "border-gray-200 hover:border-leaf"}`}>{slot}</button>)}
+              {times.map((slot) => <button type="button" key={slot} onClick={() => setTime(slot)} className={`min-h-11 rounded-lg border px-2 py-2 text-xs font-semibold ${time === slot ? "border-leaf bg-canvas text-leaf" : "border-gray-200 hover:border-leaf"}`}>{slot}</button>)}
             </div>
           </section>
 
-          {!upsellDismissed && <section className={`rounded-2xl border p-4 transition ${addOn ? "border-emerald-400/40 bg-emerald-400/10" : "border-amber-400/30 bg-amber-400/5"}`}>
+          {!upsellDismissed && <section className="rounded-xl border border-gray-200 bg-canvas p-4">
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300"><Sparkles className="h-4 w-4" /></span>
-              <div className="min-w-0 flex-1"><div className="text-sm font-bold">¡Espera! Completa tu ritual premium</div><p className="mb-0 mt-1 text-xs leading-5 text-gray-300">Lavado capilar profundo + pomada de peinado por <b className="text-amber-300">{formatMoney(3)}</b> <span className="text-gray-500 line-through">{formatMoney(10)}</span>.</p></div>
-              <button type="button" onClick={() => setUpsellDismissed(true)} aria-label="Descartar extra" className="rounded-lg p-1 text-muted hover:bg-white"><X className="h-4 w-4" /></button>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-leaf"><Sparkles className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1"><div className="text-sm font-bold">¿Quieres agregar un extra?</div><p className="mb-0 mt-1 text-xs leading-5 text-muted">Lavado capilar y pomada de peinado por {formatMoney(3)} (precio demo).</p></div>
             </div>
-            <div className="mt-3 flex gap-2">
-              <Button type="button" size="sm" variant={addOn ? "primary" : "copper"} onClick={() => setAddOn(!addOn)}>
-                {addOn ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {addOn ? "Extra agregado" : "Agregar por $3"}
-              </Button>
-              {addOn && <Button type="button" size="sm" variant="ghost" onClick={() => setAddOn(false)}><Minus className="h-4 w-4" /> Quitar</Button>}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={addOn} onChange={(event) => setAddOn(event.target.checked)} />
+                Agregar extra por {formatMoney(3)}
+              </label>
+              <button type="button" onClick={() => { setAddOn(false); setUpsellDismissed(true); }} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-muted underline underline-offset-2">No, gracias</button>
             </div>
           </section>}
 
@@ -127,15 +138,15 @@ export function BookingDialog({ item, referralCode, referralLink, couponActive, 
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-semibold">Tu nombre<input autoFocus required minLength={2} value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Ej. Juan Pérez" autoComplete="name" className="mt-1.5 h-11 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-green-100" /></label>
-            <label className="text-xs font-semibold">WhatsApp<input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="55 1234 5678" autoComplete="tel" className="mt-1.5 h-11 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-green-100" /></label>
+            <label htmlFor="booking-name" className="text-sm font-semibold">Tu nombre<input id="booking-name" autoFocus required minLength={2} value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Ej. Juan Pérez" autoComplete="name" aria-describedby={error ? "booking-error" : undefined} aria-invalid={Boolean(error && customer.trim().length < 2)} className="mt-1.5 h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/20" /></label>
+            <label htmlFor="booking-contact" className="text-sm font-semibold">Correo o teléfono<input id="booking-contact" required type="text" inputMode="email" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="correo@ejemplo.com o 55 1234 5678" autoComplete="email" aria-describedby={error ? "booking-error" : undefined} aria-invalid={Boolean(error && !contact.trim())} className="mt-1.5 h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/20" /></label>
           </div>
-          {error && <p role="alert" className="mb-0 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>}
+          {error && <p id="booking-error" role="alert" className="mb-0 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
           <div className="border-t border-gray-100 pt-4">
             <div className="mb-3 flex justify-between text-xs text-muted"><span>{item.service}{addOn ? " + Lavado premium" : ""}</span><span>{formatMoney(total)}</span></div>
             {discount > 0 && <div className="mb-3 flex justify-between text-xs font-semibold text-emerald-300"><span>Cupón de bienvenida</span><span>−{formatMoney(discount)}</span></div>}
             <div className="mb-4 flex justify-between text-base font-extrabold"><span>Total a pagar en barbería</span><span>{formatMoney(Math.max(0, total - discount))}</span></div>
-            <Button type="submit" size="lg" variant="copper" className="w-full">Reservar cita ahora · descuento aplicado <Check className="h-4 w-4" /></Button>
+            <Button type="submit" size="lg" variant="primary" className="w-full">Reservar ahora <Check className="h-4 w-4" /></Button>
             <p className="mb-0 mt-2 text-center text-[10px] text-gray-400">No se realiza ningún cobro en línea en esta demo.</p>
           </div>
         </form>
