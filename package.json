@@ -1,0 +1,24 @@
+{
+  "name": "business-solutions-api",
+  "version": "1.0.0",
+  "description": "API REST con Express, Sequelize y MySQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:create": "sequelize-cli db:create",
+    "db:seed": "sequelize-cli db:seed:all"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6",
+    "sequelize": "^6.37.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "sequelize-cli": "^6.6.5"
+  }
+}
