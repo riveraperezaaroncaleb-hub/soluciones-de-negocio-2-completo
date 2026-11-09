@@ -6,7 +6,7 @@ import type { BarberService } from "@/lib/data";
 import { useI18n } from "@/lib/i18n";
 import { formatDateLong, money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
-import { handleDialogKeyboard } from "@/lib/keyboard";
+import { handleDialogKeyboard, useDialogFocus } from "@/lib/keyboard";
 import { ADD_ON_PRICE, ModalUpsell, type AddOnSelection } from "@/components/checkout/modal-upsell";
 
 type BookingConfirmation = {
@@ -74,6 +74,7 @@ export function BookingDialog({
   const [errors, setErrors] = useState<{ name?: string; contact?: string }>({});
   const continueRef = useRef<HTMLButtonElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useDialogFocus<HTMLDivElement>();
 
   const basePrice = item.offer?.price ?? item.price;
   const addOnTotal = (addons.wash ? ADD_ON_PRICE.wash : 0) + (addons.pomade ? ADD_ON_PRICE.pomade : 0);
@@ -136,6 +137,8 @@ export function BookingDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="booking-title"
+        ref={dialogRef}
+        tabIndex={-1}
         onKeyDown={(event) => handleDialogKeyboard(event, onClose)}
         className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-sheet bg-capa shadow-modal sm:rounded-sheet"
       >

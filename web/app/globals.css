@@ -47,6 +47,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
 }
 
 body {
@@ -87,8 +88,31 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--poste-azul);
-  outline-offset: 2px;
+  outline: 3px solid var(--poste-azul);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+main [id],
+section[id] {
+  scroll-margin-top: 6rem;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::placeholder {
+  color: var(--cromo);
+  opacity: 0.85;
 }
 
 .theme-dark .bg-white,
@@ -197,9 +221,11 @@ textarea {
   z-index: 100;
   transform: translateY(-150%);
   border-radius: 0.5rem;
-  background: var(--tinta);
+  background: var(--poste-azul);
   padding: 0.75rem 1rem;
-  color: var(--capa);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
 }
 
 .skip-link:focus {
@@ -220,6 +246,21 @@ textarea {
 
 input[type="range"] {
   accent-color: var(--poste-azul);
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    border-color: ButtonText;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

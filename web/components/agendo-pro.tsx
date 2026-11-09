@@ -16,11 +16,9 @@ import {
   Instagram,
   MapPin,
   Menu,
-  Moon,
   Search,
   ShoppingBag,
   SlidersHorizontal,
-  Sun,
   UserRound,
   X,
 } from "lucide-react";
@@ -29,6 +27,7 @@ import { BookingDialog } from "@/components/booking-dialog";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { HeroTurno } from "@/components/marketplace/hero-turno";
 import { MarketingSidebar } from "@/components/marketing-sidebar";
+import { PreferenceControls } from "@/components/preference-controls";
 import { ServiceCard } from "@/components/service-card";
 import { TablaPlanes } from "@/components/membresias/tabla-planes";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,7 @@ import {
   type StoreData,
 } from "@/lib/data";
 import { useI18n } from "@/lib/i18n";
-import { handleDialogKeyboard } from "@/lib/keyboard";
+import { handleDialogKeyboard, useDialogFocus } from "@/lib/keyboard";
 import { formatClock, formatDateLong, formatDateShort, money } from "@/lib/money";
 import { personalizedVipSavings } from "@/lib/membership";
 
@@ -86,7 +85,7 @@ const demoData: StoreData = {
 };
 
 export function AgendoPro() {
-  const { locale, setLocale, t } = useI18n();
+  const { locale, t } = useI18n();
   const [store, setStore] = useState<StoreData>(demoData);
   const [hydrated, setHydrated] = useState(false);
   const [view, setView] = useState<View>("marketplace");
@@ -103,6 +102,8 @@ export function AgendoPro() {
   const [theme, setTheme] = useState<"dark" | "light">("light");
   const [bookingSuccess, setBookingSuccess] = useState<Appointment | null>(null);
   const tRef = useRef(t);
+  const successDialogRef = useDialogFocus<HTMLDivElement>(Boolean(bookingSuccess));
+  const bookingsDialogRef = useDialogFocus<HTMLElement>(bookingsOpen);
 
   useEffect(() => {
     tRef.current = t;
@@ -154,6 +155,8 @@ export function AgendoPro() {
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   useEffect(() => {
@@ -438,6 +441,8 @@ export function AgendoPro() {
     return (
       <div data-theme={theme} className={`${theme === "dark" ? "theme-dark" : "theme-light"} min-h-screen bg-[var(--azulejo)] text-[var(--tinta)]`}>
         <TablaPlanes
+          theme={theme}
+          onToggleTheme={toggleTheme}
           membership={store.membership}
           visits={personalized.visits}
           savings={personalized.savings}
@@ -516,25 +521,7 @@ export function AgendoPro() {
             </div>
           </form>
 
-          <button
-            type="button"
-            onClick={() => setLocale(locale === "es-MX" ? "en-US" : "es-MX")}
-            aria-label={t("localeToggle")}
-            title={t("localeToggle")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] text-[10px] font-bold hover:bg-canvas"
-          >
-            {locale === "es-MX" ? "EN" : "ES"}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? t("themeToLight") : t("themeToDark")}
-            title={theme === "dark" ? t("themeToLight") : t("themeToDark")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] hover:bg-canvas"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
-          </button>
+          <PreferenceControls theme={theme} onToggleTheme={toggleTheme} />
 
           <button
             type="button"
@@ -614,7 +601,7 @@ export function AgendoPro() {
         )}
       </header>
 
-      <main id="main-content" className="mx-auto max-w-[1440px] px-3 pb-28 sm:px-7 sm:pb-12">
+      <main id="main-content" className="mx-auto max-w-[1440px] px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-7 sm:pb-12">
         <HeroTurno
           service={nextSlot?.service ?? null}
           slot={nextSlot?.slot ?? null}
@@ -629,7 +616,9 @@ export function AgendoPro() {
               <div>
                 <p className="mb-1 text-xs font-semibold text-[var(--poste-azul)]">{t("serviceSectionEyebrow")}</p>
                 <h2 className="mb-1 text-xl font-extrabold tracking-tight sm:text-2xl">{t("serviceSectionTitle")}</h2>
-                <p className="mb-0 text-sm text-muted">{t("serviceCount", { n: filteredServices.length })}</p>
+                <p className="mb-0 text-sm text-muted" role="status" aria-live="polite" aria-atomic="true">
+                  {t("serviceCount", { n: filteredServices.length })}
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted">
@@ -649,12 +638,13 @@ export function AgendoPro() {
               </div>
             </div>
 
-            <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+            <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t("allCategories")}>
               {categories.map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => setCategory(item)}
+                  aria-pressed={category === item}
                   className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition ${
                     category === item
                       ? "border-[var(--tinta)] bg-[var(--tinta)] text-[var(--azulejo)]"
@@ -780,6 +770,8 @@ export function AgendoPro() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="success-title"
+            ref={successDialogRef}
+            tabIndex={-1}
             onKeyDown={(event) => handleDialogKeyboard(event, () => setBookingSuccess(null))}
             className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-sheet border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] bg-capa p-6 text-tinta shadow-modal sm:p-8"
           >
@@ -850,6 +842,8 @@ export function AgendoPro() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="bookings-title"
+            ref={bookingsDialogRef}
+            tabIndex={-1}
             onKeyDown={(event) => handleDialogKeyboard(event, () => setBookingsOpen(false))}
             className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-sheet bg-capa p-5 text-tinta sm:rounded-sheet"
           >

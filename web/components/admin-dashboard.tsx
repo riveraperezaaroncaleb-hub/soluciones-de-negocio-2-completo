@@ -10,10 +10,8 @@ import {
   Download,
   Filter,
   Gift,
-  Moon,
   Scissors,
   Settings2,
-  Sun,
   Target,
   Users,
   XCircle,
@@ -34,6 +32,7 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/money";
 import { calculateDashboardMetrics } from "@/lib/dashboard-metrics";
 import { Button } from "@/components/ui/button";
+import { PreferenceControls } from "@/components/preference-controls";
 
 type AdminDashboardProps = {
   appointments: Appointment[];
@@ -172,6 +171,7 @@ export function AdminDashboard({
 
   return (
     <div data-theme={theme} className={`${theme === "dark" ? "theme-dark" : "theme-light"} min-h-screen bg-[var(--azulejo)] text-[var(--tinta)]`}>
+      <a href="#dashboard-main" className="skip-link">{t("skipToContent")}</a>
       <header className="sticky top-0 z-30 border-b border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] bg-capa/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-3 sm:px-7">
           <div className="flex items-center gap-3">
@@ -185,20 +185,13 @@ export function AdminDashboard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              aria-label={theme === "dark" ? t("themeToLight") : t("themeToDark")}
-              className="flex h-10 w-10 items-center justify-center rounded-control border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)]"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
-            </button>
+            <PreferenceControls theme={theme} onToggleTheme={onToggleTheme} />
             <Button variant="outline" size="sm" onClick={onExit}>{t("adminBack")}</Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 sm:px-7 sm:py-8">
+      <main id="dashboard-main" className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 sm:px-7 sm:py-8">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--poste-azul)]">

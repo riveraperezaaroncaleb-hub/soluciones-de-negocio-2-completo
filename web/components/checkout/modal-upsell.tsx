@@ -5,7 +5,7 @@ import { Check, Sparkles, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
-import { handleDialogKeyboard } from "@/lib/keyboard";
+import { handleDialogKeyboard, useDialogFocus } from "@/lib/keyboard";
 
 export type AddOnSelection = { wash: boolean; pomade: boolean };
 
@@ -19,6 +19,7 @@ type ModalUpsellProps = {
 export function ModalUpsell({ onAdd, onSkip }: ModalUpsellProps) {
   const { locale, t } = useI18n();
   const [selection, setSelection] = useState<AddOnSelection>({ wash: false, pomade: false });
+  const dialogRef = useDialogFocus<HTMLDivElement>();
 
   return (
     <div
@@ -31,6 +32,8 @@ export function ModalUpsell({ onAdd, onSkip }: ModalUpsellProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="upsell-title"
+        ref={dialogRef}
+        tabIndex={-1}
         onKeyDown={(event) => handleDialogKeyboard(event, onSkip)}
         className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-sheet bg-capa p-5 shadow-modal sm:rounded-sheet sm:p-6"
       >
@@ -57,7 +60,6 @@ export function ModalUpsell({ onAdd, onSkip }: ModalUpsellProps) {
           <label className="flex cursor-pointer items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] p-3 hover:border-[var(--poste-azul)]">
             <input
               type="checkbox"
-              autoFocus
               checked={selection.wash}
               onChange={(event) => setSelection((current) => ({ ...current, wash: event.target.checked }))}
               className="mt-1 h-5 w-5 accent-[var(--poste-azul)]"

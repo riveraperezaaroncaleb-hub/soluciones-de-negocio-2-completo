@@ -7,8 +7,11 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/money";
 import { annualDiscount, annualPrice, planSavings, plans } from "@/lib/membership";
 import { Button } from "@/components/ui/button";
+import { PreferenceControls } from "@/components/preference-controls";
 
 type TablaPlanesProps = {
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
   membership: MembershipState;
   visits: number;
   savings: number;
@@ -20,6 +23,8 @@ type TablaPlanesProps = {
 };
 
 export function TablaPlanes({
+  theme,
+  onToggleTheme,
   membership,
   visits,
   savings,
@@ -35,23 +40,28 @@ export function TablaPlanes({
   const currentPlan = plans.find((plan) => plan.id === membership.plan) ?? null;
 
   return (
-    <main className="mx-auto max-w-[1200px] px-4 py-6 sm:px-7 sm:py-8">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-control text-sm font-semibold text-[var(--poste-azul)]"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t("adminBack")}
-      </button>
+    <>
+      <a href="#membership-main" className="skip-link">{t("skipToContent")}</a>
+      <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-4 pt-5 sm:px-7">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex min-h-11 items-center gap-2 rounded-control text-sm font-semibold text-[var(--poste-azul)]"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t("adminBack")}
+        </button>
+        <PreferenceControls theme={theme} onToggleTheme={onToggleTheme} />
+      </div>
 
-      <header className="mb-6 max-w-2xl">
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--laton)]">{t("membershipEyebrow")}</p>
-        <h1 className="mb-2 text-3xl font-extrabold sm:text-4xl">{t("membershipTitle")}</h1>
-        <p className="mb-0 text-sm leading-6 text-muted">{t("membershipIntro")}</p>
-      </header>
+      <main id="membership-main" className="mx-auto max-w-[1200px] px-4 py-4 sm:px-7 sm:py-5">
+        <header className="mb-6 max-w-2xl">
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--laton)]">{t("membershipEyebrow")}</p>
+          <h1 className="mb-2 text-3xl font-extrabold sm:text-4xl">{t("membershipTitle")}</h1>
+          <p className="mb-0 text-sm leading-6 text-muted">{t("membershipIntro")}</p>
+        </header>
 
-      <div className="mb-5 flex flex-col justify-between gap-3 rounded-card border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] bg-capa p-4 sm:flex-row sm:items-center">
+        <div className="mb-5 flex flex-col justify-between gap-3 rounded-card border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] bg-capa p-4 sm:flex-row sm:items-center">
         <p className="mb-0 text-sm leading-6">
           {visits > 0
             ? t("membershipPersonal", { n: visits, amount: money(savings, locale) })
@@ -75,9 +85,9 @@ export function TablaPlanes({
             {t("membershipAnnualSave", { percent: annualDiscount(plans[1]) })}
           </span>
         </button>
-      </div>
+        </div>
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-3">
+        <div className="grid items-stretch gap-4 lg:grid-cols-3">
         {plans.map((plan) => {
           const highlighted = plan.id === "vip";
           const isCurrent = membership.plan === plan.id;
@@ -105,7 +115,7 @@ export function TablaPlanes({
                     {t("activePlan")}
                   </span>
                 )}
-              </div>
+                </div>
 
               <p className="mb-1 font-display text-4xl font-bold leading-none tabular-nums">
                 {money(plan.price, locale)}
@@ -152,7 +162,7 @@ export function TablaPlanes({
         })}
       </div>
 
-      {currentPlan && (
+        {currentPlan && (
         <section className="mt-6 rounded-card border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] bg-capa p-4 sm:p-5">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
@@ -193,9 +203,10 @@ export function TablaPlanes({
             </div>
           )}
         </section>
-      )}
+        )}
 
-      <p className="mt-5 text-xs leading-5 text-muted">{t("membershipDemoNote")}</p>
-    </main>
+        <p className="mt-5 text-xs leading-5 text-muted">{t("membershipDemoNote")}</p>
+      </main>
+    </>
   );
 }

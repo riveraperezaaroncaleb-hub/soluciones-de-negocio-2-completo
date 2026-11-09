@@ -21,6 +21,9 @@ const es = {
   themeToDark: "Cambiar a modo oscuro",
   themeToLight: "Cambiar a modo claro",
   localeToggle: "Cambiar idioma",
+  preferences: "Preferencias de visualización",
+  switchToEnglish: "Cambiar idioma a inglés",
+  switchToSpanish: "Cambiar idioma a español",
   demo: "Demo",
   searchPlaceholder: "Busca un corte, barbero o barbería",
   searchLabel: "Buscar servicios o barberías",
@@ -305,6 +308,9 @@ const en: Record<MessageKey, string> = {
   themeToDark: "Switch to dark mode",
   themeToLight: "Switch to light mode",
   localeToggle: "Change language",
+  preferences: "Display preferences",
+  switchToEnglish: "Switch language to English",
+  switchToSpanish: "Switch language to Spanish",
   demo: "Demo",
   searchPlaceholder: "Search a cut, barber, or barbershop",
   searchLabel: "Search services or barbershops",
@@ -602,6 +608,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       }
       setLocaleState(window.navigator.language.toLowerCase().startsWith("en") ? "en-US" : "es-MX");
     } catch {
+      console.error("Could not read the saved language preference.");
       setLocaleState("es-MX");
     }
   }, []);
@@ -614,8 +621,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // The preference stays for the current session.
+    } catch (error) {
+      console.error("Could not save the language preference:", error);
     }
   }, []);
 
