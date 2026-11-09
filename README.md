@@ -1,105 +1,16 @@
-# Business Solutions API
+# Agendo Pro
 
-API REST con Express 5, Sequelize 6 y MySQL.
+Frontend de demostración construido con Next.js 14. No incluye API ni conexión
+a base de datos: las citas, referidos, membresías y configuración se guardan
+localmente en el navegador. No procesa pagos reales.
 
-## Agendo Pro Marketplace
+## Ejecutar
 
-La nueva tienda Next.js 14 está separada de la API anterior en `web/`, para
-mantener ambos proyectos ejecutables de manera independiente. Consulta
-[`web/README.md`](./web/README.md) para instalarla y correrla con `npm run dev`.
-Incluye marketplace responsive, checkout con upsell, referidos, dashboard con
-Recharts y datos demo guardados en el navegador. El esquema MySQL independiente
-está en [`web/database/schema.sql`](./web/database/schema.sql); tú controlas la
-creación y configuración de la base de datos. No se procesan cobros reales.
-La landing identifica como simulados los temporizadores, cupos limitados,
-valoraciones y avisos de actividad que no provienen de datos reales.
-
-## Prototipo Agendo
-
-El frontend está en `public/`; el backend Express en `routes/`, `controllers/`
-y `models/`; los cambios SQL en `migrations/`. Inicia con `npm run dev` y abre
-`http://localhost:3000`.
-
-Configura `.env` a partir de `.env.example` con credenciales MySQL válidas y
-ejecuta:
-
-```sh
-npm run db:create
-npm run db:migrate
+```powershell
+cd web
+npm install
 npm run dev
 ```
 
-El onboarding guarda la cuenta con contraseña derivada mediante scrypt y,
-después, crea la barbería, sus horarios y servicios en SQL. Los enlaces públicos
-incluyen el ID de barbería para cargar servicios reales y guardar citas,
-clientes y recompensas de referidos. Si MySQL no está disponible, el navegador
-permite recorrer el flujo en modo demostración y muestra que no se guardó en SQL.
-Las membresías pueden registrarse en SQL por 30 días, pero el prototipo no procesa
-cobros recurrentes ni pagos reales.
-
-El enlace público abre una landing con ofertas y servicios; después el cliente
-elige horario, agrega un extra, aplica un código de amigo y puede reservar.
-Tras confirmar recibe su link personal: cada cita válida hecha desde ese link
-crea una recompensa de un corte para quien lo invitó. En modo SQL, las citas y
-referidos se guardan en las tablas `Appointments` y `Referrals`.
-El endpoint `POST /api/public/subscriptions` registra el Pase VIP en
-`Subscriptions`; requiere `barbershopId`, `nombre` y `telefono`. Un registro no
-activa ningún cobro.
-
-## Preparacion
-
-1. Instala las dependencias con `npm install`.
-2. Copia `.env.example` a `.env` y configura la conexion de MySQL.
-3. Crea la base de datos configurada en `DB_NAME`:
-
-   ```sh
-   npm run db:create
-   ```
-
-4. Aplica las migraciones:
-
-   ```sh
-   npm run db:migrate
-   ```
-
-5. Inicia la API con `npm run dev` (desarrollo) o `npm start`.
-
-La API queda disponible en `http://localhost:3000`. Endpoints iniciales:
-
-- `GET /health`
-- `GET /api/usuarios`
-- `POST /api/usuarios` con JSON `{"nombre":"Ana","edad":25}`
-- `GET`, `PUT`, `PATCH` y `DELETE /api/usuarios/:id`
-- `GET /api/barbershops`
-- `POST /api/barbershops` con JSON `{"nombre":"Corte","direccion":"Calle 1","telefono":"5551234567"}`
-- `GET`, `PUT`, `PATCH` y `DELETE /api/barbershops/:id`
-- `GET` y `POST /api/services`
-- `GET`, `PUT`, `PATCH` y `DELETE /api/services/:id`
-- `GET` y `POST /api/appointments`
-- `GET`, `PUT`, `PATCH` y `DELETE /api/appointments/:id`
-- `GET` y `POST /api/subscriptions`
-- `GET`, `PUT`, `PATCH` y `DELETE /api/subscriptions/:id`
-- `GET` y `POST /api/referrals`
-- `GET`, `PUT`, `PATCH` y `DELETE /api/referrals/:id`
-
-El modelo `Barbershop` crea la tabla `Barbershops` con los campos `nombre`,
-`direccion` y `telefono`, ademas del identificador y las marcas de tiempo.
-El modelo `Service` crea la tabla `Services` y relaciona cada servicio con una
-barberia mediante `barbershopId`. Incluye nombre, descripcion, precio y duracion
-en minutos.
-El modelo `Appointment` relaciona un usuario y un servicio con fecha/hora,
-estado (`pendiente`, `confirmada`, `completada` o `cancelada`) y notas opcionales.
-El modelo `Subscription` relaciona un usuario con una barbería e incluye fechas
-de vigencia, estado (`activa`, `cancelada`, `vencida` o `pendiente`) y precio.
-El modelo `Referral` registra referencias entre usuarios con código, estado y
-recompensa opcional.
-
-## Migraciones
-
-Para generar otro modelo y su migracion:
-
-```sh
-npx sequelize-cli model:generate --name NombreModelo --attributes campo:string,otroCampo:integer
-```
-
-Aplica los cambios con `npm run db:migrate`.
+Abre `http://localhost:3001`. Consulta [`web/README.md`](./web/README.md) para
+detalles de la demo, sus datos locales y los comandos de verificación.

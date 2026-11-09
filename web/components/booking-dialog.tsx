@@ -1,156 +1,381 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
-import { CalendarDays, Check, Clock3, Gift, Instagram, Scissors, Sparkles, Users, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { CalendarDays, Check, Clock3, Gift, Scissors, Sparkles, X } from "lucide-react";
 import type { BarberService } from "@/lib/data";
-import { formatMoney } from "@/lib/data";
+import { useI18n } from "@/lib/i18n";
+import { formatDateLong, money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { handleDialogKeyboard } from "@/lib/keyboard";
+import { ADD_ON_PRICE, ModalUpsell, type AddOnSelection } from "@/components/checkout/modal-upsell";
+
+type BookingConfirmation = {
+  customer: string;
+  phone: string;
+  email?: string;
+  date: string;
+  time: string;
+  addons: AddOnSelection;
+  total: number;
+};
 
 type BookingDialogProps = {
   item: BarberService;
   referralCode: string;
-  referralLink: string;
   couponActive: boolean;
   couponAmount: number;
   onClose: () => void;
-  onShare: () => void;
-  onInstagram: () => void;
-  onConfirm: (booking: {
-    customer: string;
-    phone: string;
-    email?: string;
-    date: string;
-    time: string;
-    addOn: boolean;
-    total: number;
-  }) => void;
+  onConfirm: (booking: BookingConfirmation) => void;
 };
 
-const dates = Array.from({ length: 5 }, (_, i) => {
-  const day = new Date();
-  day.setDate(day.getDate() + i + 1);
-  return day;
-});
-const times = ["09:30", "10:30", "11:30", "12:30", "14:00", "15:30", "17:00"];
+const BASE_TIMES = ["09:30", "10:30", "11:30", "12:30", "14:00", "15:30", "17:00"];
 
-export function BookingDialog({ item, referralCode, referralLink, couponActive, couponAmount, onClose, onShare, onInstagram, onConfirm }: BookingDialogProps) {
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatLocalTime(time: string, locale: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
+}
+
+export function BookingDialog({
+  item,
+  referralCode,
+  couponActive,
+  couponAmount,
+  onClose,
+  onConfirm,
+}: BookingDialogProps) {
+  const { locale, t } = useI18n();
+  const dates = useMemo(() => Array.from({ length: 5 }, (_, index) => {
+    const day = new Date();
+    day.setHours(12, 0, 0, 0);
+    day.setDate(day.getDate() + index);
+    return day;
+  }), []);
+
+  const defaultDate = dates[item.nextSlot?.dayOffset ?? 0] ?? dates[0];
+  const defaultTime = item.nextSlot?.time ?? BASE_TIMES[2];
+  const times = useMemo(() => (
+    BASE_TIMES.includes(defaultTime) ? BASE_TIMES : [defaultTime, ...BASE_TIMES]
+  ), [defaultTime]);
+
+  const [step, setStep] = useState<1 | 2>(1);
   const [customer, setCustomer] = useState("");
   const [contact, setContact] = useState("");
-  const [date, setDate] = useState(dates[0].toISOString().slice(0, 10));
-  const [time, setTime] = useState(times[2]);
-  const [addOn, setAddOn] = useState(false);
-  const [upsellDismissed, setUpsellDismissed] = useState(false);
-  const [error, setError] = useState("");
-  const total = useMemo(() => item.price + (addOn ? 3 : 0), [item.price, addOn]);
-  const activeReferral = referralCode.trim().toUpperCase();
+  const [date, setDate] = useState(dateKey(defaultDate));
+  const [time, setTime] = useState(defaultTime);
+  const [addons, setAddons] = useState<AddOnSelection>({ wash: false, pomade: false });
+  const [upsellOpen, setUpsellOpen] = useState(false);
+  const [upsellSeen, setUpsellSeen] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; contact?: string }>({});
+  const continueRef = useRef<HTMLButtonElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  const basePrice = item.offer?.price ?? item.price;
+  const addOnTotal = (addons.wash ? ADD_ON_PRICE.wash : 0) + (addons.pomade ? ADD_ON_PRICE.pomade : 0);
   const discount = couponActive ? couponAmount : 0;
+  const total = Math.max(0, basePrice + addOnTotal - discount);
+  const activeReferral = referralCode.trim().toUpperCase();
+
+  const stepLabels = [t("bookingStep1"), t("bookingStep2"), t("bookingStep3")];
+  const currentStep = step;
+
+  const proceedToConfirm = () => {
+    setUpsellOpen(false);
+    setUpsellSeen(true);
+    setStep(2);
+    window.requestAnimationFrame(() => nameRef.current?.focus());
+  };
+
+  const handleContinue = () => {
+    if (!upsellSeen) {
+      setUpsellOpen(true);
+      return;
+    }
+    proceedToConfirm();
+  };
 
   const confirm = (event: React.FormEvent) => {
     event.preventDefault();
+    const nextErrors: { name?: string; contact?: string } = {};
+    if (customer.trim().length < 2) nextErrors.name = t("bookingErrorName");
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.trim());
     const isPhone = contact.replace(/\D/g, "").length >= 10;
-    if (customer.trim().length < 2 || (!isEmail && !isPhone)) {
-      setError("Ingresa tu nombre y un correo válido o teléfono de al menos 10 dígitos.");
-      return;
-    }
+    if (!isEmail && !isPhone) nextErrors.contact = t("bookingErrorContact");
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
     onConfirm({
       customer: customer.trim(),
       phone: isPhone ? contact.trim() : "",
       email: isEmail ? contact.trim() : undefined,
       date,
       time,
-      addOn,
-      total: Math.max(0, total - discount),
+      addons,
+      total,
     });
   };
 
+  const serviceAddOns = [
+    addons.wash ? t("upsellWash") : null,
+    addons.pomade ? t("upsellPomade") : null,
+  ].filter(Boolean).join(" + ");
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="booking-title" onKeyDown={(event) => handleDialogKeyboard(event, onClose)} className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
-          <div><p className="mb-1 text-[10px] font-extrabold uppercase tracking-[.16em] text-blue-300">Reserva segura · 2 minutos</p><h2 id="booking-title" className="mb-0 text-xl font-extrabold">Agenda tu visita</h2></div>
-          <button onClick={onClose} aria-label="Cerrar" className="rounded-full p-2 text-muted hover:bg-gray-100"><X className="h-5 w-5" /></button>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-title"
+        onKeyDown={(event) => handleDialogKeyboard(event, onClose)}
+        className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-sheet bg-capa shadow-modal sm:rounded-sheet"
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-[color-mix(in_srgb,var(--cromo)_22%,transparent)] bg-capa/95 px-5 py-4 backdrop-blur sm:px-7">
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--poste-azul)]">{t("bookingEyebrow")}</p>
+            <h2 id="booking-title" className="mb-0 text-xl font-bold">{t("bookingTitle")}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("menuClose")}
+            className="flex h-11 w-11 items-center justify-center rounded-control text-muted hover:bg-canvas"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
         </div>
+
+        <div className="border-b border-[color-mix(in_srgb,var(--cromo)_22%,transparent)] px-5 py-3 sm:px-7">
+          <ol className="flex items-center gap-2 text-[10px] font-semibold" aria-label={t("bookingEyebrow")}>
+            {stepLabels.map((label, index) => {
+              const number = index + 1;
+              const state = number < currentStep ? "done" : number === currentStep ? "current" : "todo";
+              return (
+                <li key={label} className="flex items-center gap-2" aria-current={state === "current" ? "step" : undefined}>
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full border text-[10px] ${
+                    state === "current"
+                      ? "border-[var(--poste-azul)] bg-[var(--poste-azul)] text-white"
+                      : state === "done"
+                        ? "border-[var(--ok)] bg-[color-mix(in_srgb,var(--ok)_16%,transparent)] text-[var(--ok)]"
+                        : "border-[color-mix(in_srgb,var(--cromo)_35%,transparent)] text-muted"
+                  }`}>
+                    {state === "done" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : number}
+                  </span>
+                  <span className={state === "current" ? "text-tinta" : "text-muted"}>{label}</span>
+                  {index < stepLabels.length - 1 && <span className="h-px w-4 bg-[color-mix(in_srgb,var(--cromo)_35%,transparent)]" aria-hidden="true" />}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+
         <form onSubmit={confirm} className="space-y-5 p-5 sm:p-7">
-          <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-3.5">
-            <div className="mb-2 flex items-center justify-between gap-2 text-xs"><b className="inline-flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-leaf" />Tu progreso de reserva</b><span className="font-bold text-leaf">{customer.trim().length > 1 && contact.trim() ? "2 de 2 pasos" : "1 de 2 pasos"}</span></div>
-            <div className="poste h-3 overflow-hidden rounded-full" role="progressbar" aria-valuenow={customer.trim().length > 1 && contact.trim() ? 2 : 1} aria-valuemin={0} aria-valuemax={2} aria-label="Progreso para completar la reserva" style={{ "--p": customer.trim().length > 1 && contact.trim() ? "100%" : "50%" } as CSSProperties & { "--p": string }} />
-            <p className="mb-0 mt-2 text-xs text-muted">Elige el horario y confirma tus datos para terminar.</p>
+          <div className="flex gap-3 rounded-card bg-canvas p-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-capa text-[var(--poste-azul)]">
+              <Scissors className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-bold">{item.service}</div>
+              <div className="text-xs text-muted">
+                {t("bookingServiceSummary", { service: item.service, shop: item.shopName, duration: item.duration })}
+              </div>
+            </div>
+            <b className="text-sm tabular-nums">{money(basePrice, locale)}</b>
           </div>
 
-          <div className="flex gap-3 rounded-2xl bg-canvas p-3.5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-lime/60 text-leaf"><Scissors className="h-5 w-5" /></div>
-            <div className="min-w-0 flex-1"><div className="truncate text-sm font-bold">{item.service}</div><div className="text-xs text-muted">{item.shopName} · {item.duration} min</div></div>
-            <b className="text-sm">{formatMoney(item.price)}</b>
-          </div>
+          {step === 1 ? (
+            <>
+              <section>
+                <p className="mb-2 flex items-center gap-2 text-xs font-bold text-muted">
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  {t("bookingChooseDay")}
+                </p>
+                <div className="grid grid-cols-5 gap-2">
+                  {dates.map((day) => {
+                    const key = dateKey(day);
+                    const selected = date === key;
+                    return (
+                      <button
+                        type="button"
+                        key={key}
+                        onClick={() => setDate(key)}
+                        aria-pressed={selected}
+                        className={`min-h-11 rounded-control border p-2 text-center ${
+                          selected
+                            ? "border-[var(--poste-azul)] bg-[var(--poste-azul)] text-white"
+                            : "border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] hover:border-[var(--poste-azul)]"
+                        }`}
+                      >
+                        <span className="block text-[10px] uppercase">
+                          {new Intl.DateTimeFormat(locale, { weekday: "short" }).format(day).replace(".", "")}
+                        </span>
+                        <b className="text-base tabular-nums">{day.getDate()}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
 
-          <section>
-            <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted"><CalendarDays className="h-4 w-4" /> Elige día</label>
-            <div className="grid grid-cols-5 gap-2">
-              {dates.map((day) => {
-                const key = day.toISOString().slice(0, 10);
-                const selected = date === key;
-                return <button type="button" key={key} onClick={() => setDate(key)} className={`min-h-11 rounded-lg border p-2 text-center ${selected ? "border-leaf bg-leaf text-white" : "border-gray-200 hover:border-leaf"}`}>
-                  <span className="block text-[10px] uppercase">{new Intl.DateTimeFormat("es-MX", { weekday: "short" }).format(day).replace(".", "")}</span>
-                  <b className="text-base">{day.getDate()}</b>
-                </button>;
-              })}
-            </div>
-          </section>
+              <section>
+                <p className="mb-2 flex items-center gap-2 text-xs font-bold text-muted">
+                  <Clock3 className="h-4 w-4" aria-hidden="true" />
+                  {t("bookingChooseTime")}
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {times.map((slot) => (
+                    <button
+                      type="button"
+                      key={slot}
+                      onClick={() => setTime(slot)}
+                      aria-pressed={time === slot}
+                      className={`min-h-11 rounded-control border px-2 py-2 text-xs font-semibold ${
+                        time === slot
+                          ? "border-[var(--poste-azul)] bg-[color-mix(in_srgb,var(--poste-azul)_10%,transparent)] text-[var(--poste-azul)]"
+                          : "border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] hover:border-[var(--poste-azul)]"
+                      }`}
+                    >
+                      {formatLocalTime(slot, locale)}
+                    </button>
+                  ))}
+                </div>
+              </section>
 
-          <section>
-            <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted"><Clock3 className="h-4 w-4" /> Horarios disponibles</label>
-            <div className="grid grid-cols-4 gap-2">
-              {times.map((slot) => <button type="button" key={slot} onClick={() => setTime(slot)} className={`min-h-11 rounded-lg border px-2 py-2 text-xs font-semibold ${time === slot ? "border-leaf bg-canvas text-leaf" : "border-gray-200 hover:border-leaf"}`}>{slot}</button>)}
-            </div>
-          </section>
+              <div className="border-t border-[color-mix(in_srgb,var(--cromo)_22%,transparent)] pt-4">
+                <div className="mb-3 flex items-center justify-between text-sm">
+                  <span className="text-muted">{t("bookingTotal")}</span>
+                  <b className="tabular-nums">{money(total, locale)}</b>
+                </div>
+                <Button ref={continueRef} type="button" size="lg" variant="primary" className="w-full" onClick={handleContinue}>
+                  {t("bookingContinue")}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="mb-0 text-sm font-bold">{t("bookingContactTitle")}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="min-h-11 rounded-control px-1 text-xs font-semibold text-[var(--poste-azul)] underline-offset-4 hover:underline"
+                  >
+                    {t("bookingBack")}
+                  </button>
+                </div>
 
-          {!upsellDismissed && <section className="rounded-xl border border-gray-200 bg-canvas p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-leaf"><Sparkles className="h-4 w-4" /></span>
-              <div className="min-w-0 flex-1"><div className="text-sm font-bold">¿Quieres agregar un extra?</div><p className="mb-0 mt-1 text-xs leading-5 text-muted">Lavado capilar y pomada de peinado por {formatMoney(3)} (precio demo).</p></div>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
-                <input type="checkbox" checked={addOn} onChange={(event) => setAddOn(event.target.checked)} />
-                Agregar extra por {formatMoney(3)}
-              </label>
-              <button type="button" onClick={() => { setAddOn(false); setUpsellDismissed(true); }} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-muted underline underline-offset-2">No, gracias</button>
-            </div>
-          </section>}
+                <div>
+                  <label htmlFor="booking-name" className="text-sm font-semibold">{t("bookingName")}</label>
+                  <input
+                    ref={nameRef}
+                    id="booking-name"
+                    value={customer}
+                    onChange={(event) => setCustomer(event.target.value)}
+                    placeholder={t("bookingNamePlaceholder")}
+                    autoComplete="name"
+                    required
+                    minLength={2}
+                    aria-invalid={Boolean(errors.name)}
+                    aria-describedby={errors.name ? "booking-name-error" : undefined}
+                    className="mt-1.5 h-11 w-full rounded-control border border-[color-mix(in_srgb,var(--cromo)_30%,transparent)] bg-capa px-3 text-sm outline-none focus:border-[var(--poste-azul)]"
+                  />
+                  {errors.name && <p id="booking-name-error" className="mb-0 mt-1 text-xs font-medium text-[var(--peligro)]">{errors.name}</p>}
+                </div>
 
-          {couponActive && <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-5 text-white"><Gift className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><span>Cupón de bienvenida aplicado: ahorras <b className="text-amber-300">{formatMoney(discount)}</b> en tu primera reserva.</span></div>}
-          {activeReferral && <div className="flex items-start gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-xs leading-5"><Gift className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /><span>Link de invitación <b>{activeReferral}</b> aplicado. Si completas la cita hoy, tu amigo recibe un corte gratis de demo.</span></div>}
+                <div>
+                  <label htmlFor="booking-contact" className="text-sm font-semibold">{t("bookingContact")}</label>
+                  <input
+                    id="booking-contact"
+                    type="text"
+                    inputMode="text"
+                    value={contact}
+                    onChange={(event) => setContact(event.target.value)}
+                    placeholder={t("bookingContactPlaceholder")}
+                    autoComplete="email"
+                    required
+                    aria-invalid={Boolean(errors.contact)}
+                    aria-describedby={errors.contact ? "booking-contact-error" : undefined}
+                    className="mt-1.5 h-11 w-full rounded-control border border-[color-mix(in_srgb,var(--cromo)_30%,transparent)] bg-capa px-3 text-sm outline-none focus:border-[var(--poste-azul)]"
+                  />
+                  {errors.contact && <p id="booking-contact-error" className="mb-0 mt-1 text-xs font-medium text-[var(--peligro)]">{errors.contact}</p>}
+                </div>
+              </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><Users className="h-4 w-4" /></span>
-              <div className="min-w-0 flex-1"><b className="block text-sm">¿Quieres este corte GRATIS?</b><p className="mb-2 mt-1 text-xs leading-5 text-gray-300">Comparte tu link único con 2 amigos. Si uno agenda hoy, tu cita actual queda 100% bonificada como recompensa demo.</p><code className="block truncate text-[10px] text-emerald-300">{referralLink}</code></div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" size="sm" variant="lime" onClick={onShare}><Users className="h-4 w-4" />Compartir por WhatsApp</Button>
-              <Button type="button" size="sm" variant="outline" onClick={onInstagram}><Instagram className="h-4 w-4" />Instagram Stories</Button>
-            </div>
-          </section>
+              <section className="rounded-card border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] p-4">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold">
+                  <Sparkles className="h-4 w-4 text-[var(--poste-azul)]" aria-hidden="true" />
+                  {t("bookingSummary")}
+                </h3>
+                <dl className="space-y-2 text-xs">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">{t("bookingStep1")}</dt>
+                    <dd className="mb-0 text-right font-semibold">
+                      {formatDateLong(date, locale)} · {formatLocalTime(time, locale)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">{item.service}</dt>
+                    <dd className="mb-0 text-right tabular-nums">{money(basePrice, locale)}</dd>
+                  </div>
+                  {serviceAddOns && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted">{serviceAddOns}</dt>
+                      <dd className="mb-0 text-right tabular-nums">+{money(addOnTotal, locale)}</dd>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="flex justify-between gap-3 text-[var(--ok)]">
+                      <dt>{t("bookingCoupon")}</dt>
+                      <dd className="mb-0 text-right tabular-nums">−{money(discount, locale)}</dd>
+                    </div>
+                  )}
+                </dl>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label htmlFor="booking-name" className="text-sm font-semibold">Tu nombre<input id="booking-name" autoFocus required minLength={2} value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Ej. Juan Pérez" autoComplete="name" aria-describedby={error ? "booking-error" : undefined} aria-invalid={Boolean(error && customer.trim().length < 2)} className="mt-1.5 h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/20" /></label>
-            <label htmlFor="booking-contact" className="text-sm font-semibold">Correo o teléfono<input id="booking-contact" required type="text" inputMode="email" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="correo@ejemplo.com o 55 1234 5678" autoComplete="email" aria-describedby={error ? "booking-error" : undefined} aria-invalid={Boolean(error && !contact.trim())} className="mt-1.5 h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/20" /></label>
-          </div>
-          {error && <p id="booking-error" role="alert" className="mb-0 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
-          <div className="border-t border-gray-100 pt-4">
-            <div className="mb-3 flex justify-between text-xs text-muted"><span>{item.service}{addOn ? " + Lavado premium" : ""}</span><span>{formatMoney(total)}</span></div>
-            {discount > 0 && <div className="mb-3 flex justify-between text-xs font-semibold text-emerald-300"><span>Cupón de bienvenida</span><span>−{formatMoney(discount)}</span></div>}
-            <div className="mb-4 flex justify-between text-base font-extrabold"><span>Total a pagar en barbería</span><span>{formatMoney(Math.max(0, total - discount))}</span></div>
-            <Button type="submit" size="lg" variant="primary" className="w-full">Reservar ahora <Check className="h-4 w-4" /></Button>
-            <p className="mb-0 mt-2 text-center text-[10px] text-gray-400">No se realiza ningún cobro en línea en esta demo.</p>
-          </div>
+                {activeReferral && (
+                  <p className="mb-0 mt-3 flex items-start gap-2 rounded-control bg-canvas p-2 text-[10px] leading-4 text-muted">
+                    <Gift className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--poste-azul)]" aria-hidden="true" />
+                    {t("bookingReferral", { code: activeReferral })}
+                  </p>
+                )}
+              </section>
+
+              <div className="rounded-card border border-[color-mix(in_srgb,var(--cromo)_25%,transparent)] p-4">
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <span className="text-sm font-semibold">{t("bookingTotal")}</span>
+                  <b className="font-display text-2xl leading-none tabular-nums">{money(total, locale)}</b>
+                </div>
+                <Button type="submit" size="lg" variant="primary" className="w-full">
+                  {t("bookingConfirm")}
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <p className="mb-0 mt-2 text-center text-[10px] text-muted">{t("bookingNoCharge")}</p>
+              </div>
+            </>
+          )}
         </form>
       </div>
+
+      {upsellOpen && (
+        <ModalUpsell
+          onAdd={(selection) => {
+            setAddons(selection);
+            proceedToConfirm();
+          }}
+          onSkip={() => {
+            setAddons({ wash: false, pomade: false });
+            proceedToConfirm();
+          }}
+        />
+      )}
     </div>
   );
 }

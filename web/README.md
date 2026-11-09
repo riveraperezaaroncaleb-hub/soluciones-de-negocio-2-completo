@@ -12,8 +12,8 @@ npm install
 npm run dev
 ```
 
-Abre `http://localhost:3001`. Next usa el puerto `3001` para convivir con la API
-Express existente en `3000`. Para verificar antes de publicar:
+Abre `http://localhost:3001`. La aplicación funciona sin API ni base de datos.
+Para verificar antes de publicar:
 
 ```powershell
 npm run typecheck
@@ -21,42 +21,67 @@ npm run lint
 npm run build
 ```
 
-La landing mobile-first usa tema oscuro premium con toggle claro/oscuro,
-temporizador de cupón, progreso de reserva, upsell, oferta VIP, compartir por
-WhatsApp/Web Share y aviso de actividad de muestra. Precios, cupos, cuenta
-regresiva, reseñas y actividad social son datos simulados; no afirmamos que sean
-reseñas verificadas ni urgencia real. La app conserva citas, referidos y
-membresía demo en `localStorage`; no envía datos a MySQL ni procesa pagos. El
-recorrido de una reserva crea la conversión de referido y acredita el corte
-gratis en los datos simulados. Puedes probar un enlace entrante con
-`http://localhost:3001/?ref=CARLOS-BARBER`. El dashboard se abre desde el botón
-**Admin** o el enlace del pie de página.
+## Sistema de diseño
 
-El dashboard agrega las citas y referidos persistidos en el navegador; los
-filtros de barbería y fechas se aplican a sus métricas y gráficas. Los ingresos
-consideran únicamente citas marcadas como completadas y son importes registrados,
-no pagos verificados. El CAC se calcula como gasto de adquisición configurado
-para el periodo dividido entre clientes nuevos identificados por su primera
-cita. El LTV mostrado es observado (ingresos acumulados de citas completadas
-divididos entre clientes con al menos una cita completada), no una proyección.
-LTV:CAC solo aparece cuando ambas métricas se pueden calcular. El gasto de
-adquisición debe ingresarse en el panel; una versión anterior del estado guardado
-se migra con gasto sin registrar, por lo que CAC queda sin calcular hasta
-capturarlo. La demo no está conectada a SQL y los datos se limitan a ese navegador.
+La interfaz aplica un sistema visual inspirado en el poste de barbero:
+tipografía Big Shoulders Display para cifras y Hanken Grotesk para texto,
+tokens de color (`--azulejo`, `--capa`, `--tinta`, `--poste-azul`,
+`--poste-rojo`, `--laton`), modo claro/oscuro persistente y soporte para
+`prefers-reduced-motion`. La página principal prioriza el **próximo turno
+libre** antes que cualquier banner, con una sola llamada roja a la acción por
+pantalla y CTAs azules para acciones secundarias.
 
-## Esquema SQL
+La interfaz está disponible en español (es-MX) e inglés (en-US); el selector
+del encabezado guarda la preferencia en `localStorage` y sincroniza
+`document.documentElement.lang`.
 
-`database/schema.sql` contiene el esquema para MySQL 8: usuarios, barberías,
-servicios, ofertas, suscripciones, citas, códigos de referido reutilizables y
-conversiones. Selecciona tu base de datos y ejecuta el archivo en tu entorno.
-No incluye credenciales, creación de base de datos ni datos reales.
-Los importes usan `DECIMAL` y `currency CHAR(3)`, con USD como valor inicial.
+## Datos de demostración
 
-La conversión debe persistirse en una transacción: validar que el código esté
-activo y pertenezca a la barbería, crear/obtener al cliente, crear la cita,
-registrar una fila de `referrals` y acreditar una sola recompensa al invitador.
-El estado `rewarded` y `reward_credited_at` permiten evitar duplicar créditos.
-Conecta el frontend a esos endpoints al configurar tu API y reglas comerciales.
+La demo no está conectada a MySQL ni procesa pagos. Las citas, referidos,
+membresía, oferta y configuración del panel se guardan localmente.
+
+- **Oferta relámpago:** se crea una sola vez con 2 h 14 min 9 s de duración,
+  inventario 2/12 y etiqueta visible `Demo`. No se reinicia automáticamente; si
+  vence o se agota, queda así. Los cupos se descuentan al reservar el servicio
+  de la oferta.
+- **Prueba social y disponibilidad:** valoraciones, reservas semanales y turnos
+  son datos de muestra. No representan actividad real.
+- **Poste de referidos:** cada invitado que completa su primera cita suma un
+  crédito y avanza el poste de 0 a 3. El canje descuenta un crédito. El botón
+  de simulación del invitado es una prueba local y está marcado como tal.
+- **Link entrante:** puedes probar `http://localhost:3001/?ref=CARLOS-BARBER`.
+  El código aplica el cupón de bienvenida a la reserva; el crédito del poste se
+  otorga al invitador, no a quien usa el enlace.
+- **Checkout:** dos pasos (horario y datos) con un up-sell opcional antes de
+  confirmar. Nada está preseleccionado y el cupón de bienvenida se descuenta una
+  sola vez. No se realiza ningún cobro.
+- **Membresías:** Basic, VIP y Family, con cambio a cobro anual, ahorro
+  personalizado según el historial, pausa de un mes y cancelación con
+  consecuencias visibles. Los precios son de demostración.
+- **Chat:** respuestas guionizadas. Detecta y enmascara tarjetas, contraseñas y
+  datos fiscales; no los guarda ni los envía.
+
+Claves de almacenamiento: `agendo-pro-store-v1`, `agendo-pro-referral-code-v1`,
+`agendo-pro-theme-v1` y `agendo-pro-locale-v1`.
+
+## Dashboard
+
+Se abre desde **Admin** o el enlace del pie de página. Incluye:
+
+- KPIs de reservas, conversión de referidos, ingresos completados, clientes
+  activos, CAC y LTV observado.
+- Gráfica mensual MRR vs CAC con leyenda que distingue las series por forma y
+  color, además de una tabla de datos alternativa.
+- Salud LTV:CAC, payback y CAC por canal.
+- Simulador «¿Y si…?» con precio de membresía, referidos y CAC; los cálculos se
+  difieren con `useDeferredValue`.
+- Descarga CSV, filtros por barbería y fechas, embudo de referidos, actividad
+  reciente y configuración de cupón, comisión y gasto de adquisición.
+
+Los ingresos consideran únicamente citas completadas y son importes registrados,
+no pagos verificados. El CAC es el gasto de adquisición del periodo dividido
+entre clientes nuevos (primera cita). El LTV es observado, no una proyección.
+Las proyecciones del simulador están marcadas como demo.
 
 ## Nota de despliegue
 
@@ -68,9 +93,12 @@ mayor requiere revisar compatibilidad antes de aplicarla.
 
 ## Estructura
 
-- `app/`: App Router, layout, estilos y página inicial.
-- `components/`: marketplace, tarjetas, sidebar de marketing, checkout/up-sell
-  y dashboard de administración.
+- `app/`: App Router, layout, fuentes, estilos y página inicial.
+- `components/marketplace/`: hero de próximo turno y oferta relámpago.
+- `components/poste/`: progreso accesible del poste.
+- `components/checkout/`: modal de up-sell.
+- `components/membresias/`: tabla de planes y flujo de cancelación.
+- `components/chat/`: chat con protección de datos sensibles.
 - `components/ui/`: componentes reutilizables al estilo shadcn/ui.
-- `lib/`: catálogo demo, tipos, formato MX y utilidades.
-- `database/schema.sql`: esquema relacional.
+- `lib/`: catálogo demo, disponibilidad, membresías, métricas, i18n, moneda y
+  utilidades.

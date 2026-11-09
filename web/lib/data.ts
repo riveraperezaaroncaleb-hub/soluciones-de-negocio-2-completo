@@ -1,3 +1,11 @@
+import type { Locale, Slot } from "@/lib/money";
+
+export type ServiceOffer = {
+  id: string;
+  price: number;
+  anchorPrice: number;
+};
+
 export type BarberService = {
   id: string;
   shopId: string;
@@ -12,6 +20,10 @@ export type BarberService = {
   duration: number;
   image: string;
   badge?: string;
+  weeklyBookings?: number;
+  nextSlot: Slot | null;
+  offer?: ServiceOffer;
+  favoriteBarber?: string;
 };
 
 export type Appointment = {
@@ -41,17 +53,44 @@ export type Referral = {
   reward: string;
 };
 
+export type StoreOffer = {
+  id: string;
+  serviceId: string;
+  title: string;
+  description: string;
+  price: number;
+  anchorPrice: number;
+  inventoryLimit: number;
+  remaining: number;
+  startsAt: string;
+  endsAt: string;
+  isDemo: true;
+};
+
+export type MembershipPlanId = "basic" | "vip" | "family";
+
+export type MembershipState = {
+  plan: MembershipPlanId | null;
+  annual: boolean;
+  pausedUntil?: string | null;
+};
+
+export type MarketingConfig = {
+  newCustomerCoupon: number;
+  platformCommission: number;
+  acquisitionSpend: number | null;
+};
+
 export type StoreData = {
   appointments: Appointment[];
   referrals: Referral[];
   referralCredits: number;
   vipActive: boolean;
   welcomeCouponUsed: boolean;
-  marketingConfig: {
-    newCustomerCoupon: number;
-    platformCommission: number;
-    acquisitionSpend: number | null;
-  };
+  favoriteServiceId: string;
+  offer: StoreOffer | null;
+  membership: MembershipState;
+  marketingConfig: MarketingConfig;
 };
 
 export const services: BarberService[] = [
@@ -68,6 +107,9 @@ export const services: BarberService[] = [
     reviews: 248,
     duration: 35,
     image: "photo-1503951914875-452162b0f3f1",
+    weeklyBookings: 37,
+    nextSlot: { dayOffset: 0, time: "16:30" },
+    favoriteBarber: "Mateo",
   },
   {
     id: "navaja-barba",
@@ -83,6 +125,9 @@ export const services: BarberService[] = [
     duration: 25,
     image: "photo-1621605815971-fbc98d665033",
     badge: "Toalla caliente",
+    weeklyBookings: 21,
+    nextSlot: { dayOffset: 0, time: "18:00" },
+    favoriteBarber: "Mateo",
   },
   {
     id: "navaja-combo",
@@ -97,6 +142,10 @@ export const services: BarberService[] = [
     reviews: 94,
     duration: 60,
     image: "photo-1599351431202-1e0f0137899a",
+    weeklyBookings: 14,
+    nextSlot: { dayOffset: 0, time: "17:30" },
+    offer: { id: "oferta-combo", price: 18, anchorPrice: 25 },
+    favoriteBarber: "Mateo",
   },
   {
     id: "norte-corte",
@@ -111,6 +160,9 @@ export const services: BarberService[] = [
     reviews: 173,
     duration: 40,
     image: "photo-1599351431202-1e0f0137899a",
+    weeklyBookings: 29,
+    nextSlot: { dayOffset: 1, time: "10:30" },
+    favoriteBarber: "Renata",
   },
   {
     id: "norte-combo",
@@ -125,6 +177,9 @@ export const services: BarberService[] = [
     reviews: 88,
     duration: 65,
     image: "photo-1621605815971-fbc98d665033",
+    weeklyBookings: 11,
+    nextSlot: { dayOffset: 1, time: "12:00" },
+    favoriteBarber: "Renata",
   },
   {
     id: "sur-barba",
@@ -139,6 +194,9 @@ export const services: BarberService[] = [
     reviews: 71,
     duration: 30,
     image: "photo-1622286342621-4bd786c2447c",
+    weeklyBookings: 18,
+    nextSlot: { dayOffset: 0, time: "19:00" },
+    favoriteBarber: "Diego",
   },
   {
     id: "sur-corte",
@@ -153,6 +211,9 @@ export const services: BarberService[] = [
     reviews: 109,
     duration: 40,
     image: "photo-1503951914875-452162b0f3f1",
+    weeklyBookings: 23,
+    nextSlot: { dayOffset: 1, time: "11:00" },
+    favoriteBarber: "Diego",
   },
   {
     id: "navaja-lavado",
@@ -167,6 +228,8 @@ export const services: BarberService[] = [
     reviews: 52,
     duration: 30,
     image: "photo-1599351431202-1e0f0137899a",
+    nextSlot: null,
+    favoriteBarber: "Mateo",
   },
 ];
 
@@ -254,16 +317,134 @@ export const initialAppointments: Appointment[] = [
     status: "Pendiente",
     createdAt: "2026-11-04",
   },
+  {
+    id: "AG-2038",
+    customer: "Mariana Torres",
+    phone: "555 017 2291",
+    shopId: "casa-navaja",
+    shopName: "Casa Navaja",
+    service: "Combo Premium",
+    date: "2026-10-22",
+    time: "17:30",
+    amount: 18,
+    status: "Completada",
+    createdAt: "2026-10-20",
+  },
+  {
+    id: "AG-2037",
+    customer: "Mariana Torres",
+    phone: "555 017 2291",
+    shopId: "casa-navaja",
+    shopName: "Casa Navaja",
+    service: "Corte clásico",
+    date: "2026-10-08",
+    time: "16:00",
+    amount: 15,
+    status: "Completada",
+    createdAt: "2026-10-06",
+  },
+  {
+    id: "AG-2036",
+    customer: "Mariana Torres",
+    phone: "555 017 2291",
+    shopId: "casa-navaja",
+    shopName: "Casa Navaja",
+    service: "Perfilado de barba",
+    date: "2026-09-24",
+    time: "18:30",
+    amount: 12,
+    status: "Completada",
+    createdAt: "2026-09-22",
+  },
 ];
 
-export const formatMoney = (amount: number) =>
-  new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(amount);
+export const DEMO_OFFER_DURATION_MS = (2 * 60 * 60 + 14 * 60 + 9) * 1000;
 
-export const formatDate = (date: string) =>
-  new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "numeric" }).format(
+export function createDemoOffer(now = new Date()): StoreOffer {
+  return {
+    id: "oferta-combo",
+    serviceId: "navaja-combo",
+    title: "Corte + barba",
+    description: "Combo Premium con toalla caliente",
+    price: 18,
+    anchorPrice: 25,
+    inventoryLimit: 12,
+    remaining: 2,
+    startsAt: now.toISOString(),
+    endsAt: new Date(now.getTime() + DEMO_OFFER_DURATION_MS).toISOString(),
+    isDemo: true,
+  };
+}
+
+export const defaultMarketingConfig: MarketingConfig = {
+  newCustomerCoupon: 5,
+  platformCommission: 8,
+  acquisitionSpend: null,
+};
+
+export function isStoreOffer(value: unknown): value is StoreOffer {
+  if (!value || typeof value !== "object") return false;
+  const offer = value as Partial<StoreOffer>;
+  return typeof offer.id === "string"
+    && typeof offer.serviceId === "string"
+    && typeof offer.title === "string"
+    && typeof offer.price === "number"
+    && typeof offer.anchorPrice === "number"
+    && typeof offer.inventoryLimit === "number"
+    && typeof offer.remaining === "number"
+    && typeof offer.startsAt === "string"
+    && typeof offer.endsAt === "string";
+}
+
+export function normalizeStoreData(value: unknown): StoreData | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<StoreData>;
+  if (!Array.isArray(candidate.appointments) || !Array.isArray(candidate.referrals)) return null;
+
+  const marketing: Partial<MarketingConfig> = candidate.marketingConfig && typeof candidate.marketingConfig === "object"
+    ? candidate.marketingConfig
+    : {};
+
+  return {
+    appointments: candidate.appointments,
+    referrals: candidate.referrals,
+    referralCredits: typeof candidate.referralCredits === "number" ? candidate.referralCredits : 0,
+    vipActive: Boolean(candidate.vipActive),
+    welcomeCouponUsed: Boolean(candidate.welcomeCouponUsed),
+    favoriteServiceId: typeof candidate.favoriteServiceId === "string"
+      ? candidate.favoriteServiceId
+      : "navaja-corte",
+    offer: isStoreOffer(candidate.offer) ? candidate.offer : null,
+    membership: candidate.membership && typeof candidate.membership === "object"
+      ? {
+          plan: candidate.membership.plan === "basic" || candidate.membership.plan === "vip" || candidate.membership.plan === "family"
+            ? candidate.membership.plan
+            : null,
+          annual: Boolean(candidate.membership.annual),
+          pausedUntil: typeof candidate.membership.pausedUntil === "string" ? candidate.membership.pausedUntil : null,
+        }
+      : { plan: null, annual: false, pausedUntil: null },
+    marketingConfig: {
+      newCustomerCoupon: typeof marketing.newCustomerCoupon === "number"
+        ? marketing.newCustomerCoupon
+        : defaultMarketingConfig.newCustomerCoupon,
+      platformCommission: typeof marketing.platformCommission === "number"
+        ? marketing.platformCommission
+        : defaultMarketingConfig.platformCommission,
+      acquisitionSpend: typeof candidate.marketingConfig?.acquisitionSpend === "number"
+        ? candidate.marketingConfig.acquisitionSpend
+        : null,
+    },
+  };
+}
+
+export const formatMoney = (amount: number) => new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+}).format(amount);
+
+export const formatDate = (date: string, locale: Locale = "es-MX") =>
+  new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric" }).format(
     new Date(`${date}T12:00:00`),
   );

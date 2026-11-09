@@ -1,4 +1,5 @@
 import type { Appointment, Referral } from "@/lib/data";
+import type { Locale } from "@/lib/money";
 
 type DashboardFilters = {
   shopId: string | null;
@@ -6,6 +7,7 @@ type DashboardFilters = {
   toDate: string;
   acquisitionSpend: number | null;
   now?: Date;
+  locale?: Locale;
 };
 
 type MonthMetric = {
@@ -105,7 +107,7 @@ export function calculateDashboardMetrics(
     const monthAppointments = periodAppointments.filter((appointment) =>
       monthKey(appointment.date) === key);
     months.push({
-      month: new Intl.DateTimeFormat("es-MX", { month: "short" }).format(monthStart),
+      month: new Intl.DateTimeFormat(filters.locale ?? "es-MX", { month: "short" }).format(monthStart),
       revenue: monthAppointments
         .filter((appointment) => appointment.status === "Completada")
         .reduce((sum, appointment) => sum + appointment.amount, 0),
